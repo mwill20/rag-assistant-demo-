@@ -25,3 +25,4 @@ data/*
 # --- Secrets ---
 .env
 !.env_example
+*.egg-info/
