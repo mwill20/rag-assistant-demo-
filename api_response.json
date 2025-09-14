@@ -1,0 +1,6 @@
+﻿{
+    "answer":  "# Ready Tensor AAIDC â Project 1 (Mock Notes)\n\nThis project builds a minimal RAG assistant using LangChain and Chroma.\nKey components: document loaders, text splitter (chunk ~1000, overlap ~200),\nSentenceTransformers embeddings (all-MiniLM-L6-v2), and a retriever that returns\ncitations to source chunks.\n\nSubmission: publication with GitHub repo, clear README, and optional 60â90s demo video.",
+    "sources":  [
+                    "data\\dummy.md"
+                ]
+}

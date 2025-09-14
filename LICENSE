@@ -1,0 +1,7 @@
+
+### `LICENSE`
+Use MIT (simple and permissive). Paste the standard MIT text.
+
+### `data/README.md`
+```markdown
+Place course PDFs/Markdown here. Do not commit sensitive data.
