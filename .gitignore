@@ -1,12 +1,27 @@
-# Ignore virtual environment
+﻿# --- Python env & caches ---
 .venv/
-
-# Ignore local environment variables
-.env
-
-# Ignore vector database persistence
-storage/
-
-# Ignore Python cache
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Coverage / reports ---
+.coverage
+htmlcov/
+
+# --- IDE / OS noise ---
+.vscode/
+.DS_Store
+Thumbs.db
+
+# --- App artifacts ---
+storage/
+data/*
+!data/.gitkeep
+
+# --- Secrets ---
+.env
+!.env_example
