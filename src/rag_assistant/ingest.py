@@ -1,65 +1,83 @@
+# src/rag_assistant/ingest.py
+
 from pathlib import Path
 from typing import List
 
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
+from langchain_community.document_loaders import (
+    DirectoryLoader,
+    TextLoader,
+    PyPDFLoader,
+)
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
 from .config import settings
-from .utils import ensure_dirs
 
 
-def load_docs(data_dir: str) -> List:
-    """Load PDFs, .md, and .txt from DATA_DIR (top-level)."""
-    docs = []
+def _load_documents(data_dir: str) -> List:
+    """Load MD/TXT/PDF from data_dir with encoding autodetect for text files."""
     data_path = Path(data_dir)
     if not data_path.exists():
-        print(f"[ingest] DATA_DIR not found: {data_dir}")
-        return docs
+        print(f"[ingest] Data dir does not exist: {data_path}")
+        return []
 
-    for p in data_path.glob("*"):
-        # Skip a readme in the data folder; it's usually instructions, not content.
-        if p.name.lower() == "readme.md":
-            continue
-        if p.is_dir():
-            continue
+    loaders = [
+        DirectoryLoader(
+            str(data_path),
+            glob="*.md",
+            loader_cls=TextLoader,
+            loader_kwargs={"encoding": "utf-8", "autodetect_encoding": True},
+        ),
+        DirectoryLoader(
+            str(data_path),
+            glob="*.txt",
+            loader_cls=TextLoader,
+            loader_kwargs={"encoding": "utf-8", "autodetect_encoding": True},
+        ),
+        DirectoryLoader(
+            str(data_path),
+            glob="*.pdf",
+            loader_cls=PyPDFLoader,
+        ),
+    ]
 
-        if p.suffix.lower() == ".pdf":
-            docs.extend(PyPDFLoader(str(p)).load())
-        elif p.suffix.lower() in {".md", ".txt"}:
-            docs.extend(TextLoader(str(p), encoding="utf-8").load())
+    docs: List = []
+    for ld in loaders:
+        try:
+            docs.extend(ld.load())
+        except Exception as e:
+            print(f"[ingest] Loader error ({ld}): {e}")
+
+    # Strip stray UTF-8 BOM chars to avoid Windows console/test failures.
+    for d in docs:
+        if getattr(d, "page_content", None):
+            d.page_content = d.page_content.replace("\ufeff", "")
 
     return docs
 
 
-def main() -> None:
-    # Make sure the storage directory exists
-    ensure_dirs(settings.CHROMA_DIR)
-
+def main():
     print(f"[ingest] Loading documents from: {settings.DATA_DIR}")
-    docs = load_docs(settings.DATA_DIR)
+    docs = _load_documents(settings.DATA_DIR)
+
     if not docs:
-        print("[ingest] No documents found. Put files in the data/ folder and retry.")
+        print("[ingest] No documents found. Put files in ./data and re-run.")
         return
 
-    # Split into overlapping chunks
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = splitter.split_documents(docs)
     print(f"[ingest] Created {len(chunks)} chunks")
 
-    # Build embeddings (HuggingFace sentence-transformers)
     embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
+    vs = Chroma(embedding_function=embeddings, persist_directory=settings.CHROMA_DIR)
 
-    # Create/persist Chroma DB. With langchain-chroma, persistence is automatic
-    # when persist_directory is provided.
-    Chroma.from_documents(
-        documents=chunks,
-        embedding=embeddings,
-        persist_directory=settings.CHROMA_DIR,
-    )
-
-    print(f"Ingested {len(chunks)} chunks into {settings.CHROMA_DIR}")
+    # Add & auto-persist (PersistentClient writes to disk automatically)
+    if chunks:
+        vs.add_documents(chunks)
+        print(f"Ingested {len(chunks)} chunks into {settings.CHROMA_DIR}")
+    else:
+        print("[ingest] No chunks created; nothing ingested.")
 
 
 if __name__ == "__main__":

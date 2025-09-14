@@ -8,3 +8,5 @@ python-dotenv
 pypdf
 openai
 groq
+pytest
+httpx
