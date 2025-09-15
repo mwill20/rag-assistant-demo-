@@ -1,13 +1,6 @@
-# src/rag_assistant/qa.py
+﻿# src/rag_assistant/qa.py
 
-import sys
-import json
-from typing import List, Tuple
-
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_chroma import Chroma
-
-from .config import settings
+import sys, json
 
 # Ensure Windows consoles can emit UTF-8 (avoids cp1252 UnicodeEncodeError)
 try:
@@ -15,41 +8,26 @@ try:
 except Exception:
     pass
 
-
-def _strip_bom(s: str) -> str:
-    # Remove any UTF-8 BOM characters that can sneak into docs
-    return s.replace("\ufeff", "") if s else s
-
-
-def run_qa(question: str) -> Tuple[str, List[str]]:
-    """Return (answer_text, sources_list) using extractive fallback over top-k chunks."""
-    embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
-    vs = Chroma(embedding_function=embeddings, persist_directory=settings.CHROMA_DIR)
-    retriever = vs.as_retriever(search_kwargs={"k": 3})
-
-    docs = retriever.get_relevant_documents(question) or []
-
-    cleaned = [_strip_bom(d.page_content or "").strip() for d in docs]
-    cleaned = [c for c in cleaned if c]
-
-    stitched = "\n---\n".join(cleaned)
-    sources = [d.metadata.get("source", "?") for d in docs if d is not None]
-
-    if not stitched:
-        stitched = (
-            "No relevant content retrieved. Ensure documents exist in DATA_DIR and run "
-            "`make ingest` before asking questions."
-        )
-
-    return stitched, sources
-
+from .pipeline import run_pipeline
 
 def main():
-    query = " ".join(sys.argv[1:]).strip() if len(sys.argv) > 1 else "What is this project?"
-    answer, sources = run_qa(query)
-    result = {"answer": answer, "sources": sources}
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    args = sys.argv[1:]
+    use_text = any(a.strip() == "--text" for a in args)
+    question = " ".join(a for a in args if not a.startswith("--")).strip() or "What is this project?"
+    fmt = "text" if use_text else "json"
+    result = run_pipeline(question, return_format=fmt)
 
+    if fmt == "json":
+        print(json.dumps(result, ensure_ascii=False))
+    else:
+        # result is a plain string from pipeline TEXT mode
+        if isinstance(result, dict):
+            # defensive: if provider returned JSON anyway
+            ans = (result.get("answer") or "").strip()
+            srcs = result.get("sources") or []
+            print(ans + ("\n\nSources:\n" + "\n".join(f"- {s}" for s in srcs) if srcs else ""))
+        else:
+            print(result)
 
 if __name__ == "__main__":
     main()
