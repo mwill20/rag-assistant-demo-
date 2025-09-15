@@ -225,3 +225,14 @@ Documentation
 - pytest green locally; minimal, focused tests.
 - Type hints and docstrings for public functions (as time permits).
 - Optional: add pre-commit with black, ruff, mypy, pytest hooks.
+
+### Retrieval modes
+Choose with `RETRIEVAL_MODE`:
+
+- `knn` (default): vector similarity over MiniLM embeddings
+- `mmr`: diversity-aware retrieval (MMR) on the same vectors
+- `bm25`: token-based lexical retrieval (BM25) built in-memory from persisted chunks
+
+Change mode:
+  Windows (PowerShell):  $env:RETRIEVAL_MODE='bm25'
+  macOS/Linux (bash):    export RETRIEVAL_MODE=bm25

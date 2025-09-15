@@ -1,7 +1,6 @@
 ﻿# src/rag_assistant/pipeline.py
-
 from pathlib import Path
-import json, re
+import json, re, os
 from typing import List
 
 from .config import settings
@@ -48,7 +47,12 @@ def _extract_sources(docs) -> List[str]:
     srcs = []
     for d in docs:
         meta = getattr(d, "metadata", {}) or {}
-        s = meta.get("source") or meta.get("file_path") or meta.get("path") or meta.get("pdf_path")
+        s = (
+            meta.get("source")
+            or meta.get("file_path")
+            or meta.get("path")
+            or meta.get("pdf_path")
+        )
         if s:
             srcs.append(s)
     return _unique(srcs)
@@ -70,6 +74,7 @@ def _coerce_json(raw: str, context: str, sources: List[str]) -> dict:
     ans = (data.get("answer") or "").strip()
     srcs = data.get("sources") or []
 
+    # If a provider parrots our prompt back, fall back to context snippet.
     if ans.startswith("Answer using ONLY the CONTEXT below") or (
         "RETURN_FORMAT" in ans and "CONTEXT:" in ans
     ):
@@ -83,7 +88,6 @@ def _coerce_json(raw: str, context: str, sources: List[str]) -> dict:
 
 
 def _count_words(s: str) -> int:
-    # word = sequence of alnum/underscore between spaces
     tokens = re.findall(r"\b\w+\b", s or "")
     return len(tokens)
 
@@ -97,7 +101,7 @@ def _maybe_force_exact_words(question: str, answer: str) -> str:
     """
     If the question asks for 'exactly N words', try to enforce it:
     1) Ask the LLM to rewrite to exactly N words, no punctuation.
-    2) If still off, trim to N if too long; otherwise leave normalized answer.
+    2) If still off, trim to N if too long; otherwise return normalized answer.
     """
     m = re.search(r"exactly\s+(\d+)\s+words", question, flags=re.I)
     if not m:
@@ -131,10 +135,14 @@ def _maybe_force_exact_words(question: str, answer: str) -> str:
 
 def run_pipeline(question: str, return_format: str | None = None):
     # 1) Retrieve
-    retriever = get_retriever()
+    persist = os.getenv("CHROMA_DIR", "./storage")
+    top_k = int(os.getenv("TOP_K", "2"))
+    retriever = get_retriever(persist_directory=persist, k=top_k)
     try:
+        # Newer retrievers expose .invoke
         docs = retriever.invoke(question)
     except Exception:
+        # Older retrievers expose .get_relevant_documents
         docs = retriever.get_relevant_documents(question) or []
 
     sources = _extract_sources(docs)
@@ -163,7 +171,9 @@ def run_pipeline(question: str, return_format: str | None = None):
         except Exception:
             continue
     if not raw:
-        raw = json.dumps({"answer": (context[:600] or "No context found."), "sources": sources})
+        raw = json.dumps(
+            {"answer": (context[:600] or "No context found."), "sources": sources}
+        )
 
     # 4) Format handling
     if rf == "json":
@@ -189,3 +199,4 @@ def run_pipeline(question: str, return_format: str | None = None):
             answer = raw_str
         answer = _maybe_force_exact_words(question, answer)
         return _render_text(answer, sources)
+

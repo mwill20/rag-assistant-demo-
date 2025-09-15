@@ -34,3 +34,8 @@ test:
 # Re-ingest using MMR retrieval (cross-platform; sets env inside Python)
 mmr:
 	$(PY) -c "import os,sys,subprocess; os.environ['RETRIEVAL_MODE']='mmr'; sys.exit(subprocess.call([sys.executable,'-m','rag_assistant.ingest']))"
+
+reindex:
+    python -c "import shutil,os; d='storage'; shutil.rmtree(d, ignore_errors=True); os.makedirs(d, exist_ok=True)"
+    python -m rag_assistant.ingest
+
