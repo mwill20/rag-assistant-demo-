@@ -25,7 +25,9 @@ def _bm25_from_storage(persist_directory: str, k: int) -> BM25Retriever:
     # replace with a lightweight disk-backed text store.
     data = vs.get(limit=100000, include=["documents", "metadatas"])
     docs: list[Document] = []
-    for text, meta in zip(data.get("documents", []), data.get("metadatas", []), strict=False):
+    for text, meta in zip(
+        data.get("documents", []), data.get("metadatas", []), strict=False
+    ):
         docs.append(Document(page_content=text or "", metadata=meta or {}))
     retriever = BM25Retriever.from_documents(docs)
     retriever.k = max(1, k)
