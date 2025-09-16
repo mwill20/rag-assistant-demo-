@@ -42,15 +42,16 @@ jobs:
           pip install langchain-huggingface
 
       - name: Prefetch embedding model (best-effort)
+        if: runner.os == 'Linux'  # Only run on Linux
         run: |
-          python - << 'PY'
+          python3 -c "
           try:
               from sentence_transformers import SentenceTransformer
-              SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-              print("Prefetch OK")
+              SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+              print('Prefetch OK')
           except Exception as e:
-              print("Prefetch warning:", e)
-          PY
+              print('Prefetch warning:', e)
+          "
 
       - name: Ingest demo corpus
         run: python -m rag_assistant.ingest

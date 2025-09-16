@@ -1,10 +1,19 @@
 ﻿from __future__ import annotations
+
 import json
 import os
 import re
 from pathlib import Path
+from typing import Optional
+
+from pydantic import BaseModel
 
 from .config import settings
+from .providers import get_provider_stack, get_retriever
+
+class QAResponse(BaseModel):
+    answer: str
+    sources: list[str]
 
 _DEF_PROMPT = (
     "You are a helpful RAG assistant. Use only the provided context. "

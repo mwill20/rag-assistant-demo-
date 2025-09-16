@@ -17,6 +17,9 @@ class Settings:
     DATA_DIR: str = _env("DATA_DIR", str(Path("data").resolve()))
     CHROMA_DIR: str = _env("CHROMA_DIR", str(Path("storage").resolve()))
 
+    # Model settings
+    EMBEDDING_MODEL: str = _env("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+
     # Search settings
     SEARCH_TYPE: str = _env("SEARCH_TYPE", "similarity")
 
