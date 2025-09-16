@@ -1,4 +1,4 @@
-﻿# src/rag_assistant/ingest.py
+# src/rag_assistant/ingest.py
 
 from pathlib import Path
 

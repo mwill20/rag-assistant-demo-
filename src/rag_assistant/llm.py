@@ -1,48 +1,33 @@
-import json
+# src/rag_assistant/llm.py
 
-from .config import LLM_PROVIDER, OPENAI_MODEL
+from __future__ import annotations
 
+from .config import settings
 
-class NullLLM:
-    """Fallback: returns a succinct stitched extract as 'answer'."""
-
-    def generate(self, system_prompt: str, user_prompt: str) -> str:
-        # Expect user_prompt to include a JSON schema instruction; we comply minimally.
-        try:
-            payload = {"answer": user_prompt[:500], "sources": []}
-            return json.dumps(payload)
-        except Exception:
-            return '{"answer":"No answer available","sources":[]}'
+# Expose module-level constants for backward compatibility with code/tests
+LLM_PROVIDER: str = settings.LLM_PROVIDER  # "none" | "openai" | "groq" | "gemini"
+OPENAI_MODEL: str = settings.OPENAI_MODEL
+GROQ_MODEL: str = settings.GROQ_MODEL
+GEMINI_MODEL: str = settings.GEMINI_MODEL
 
 
-_llm_singleton = None
+def get_active_provider() -> str:
+    """
+    Return the normalized active provider.
+    Tests/CI default to 'none' to avoid network calls.
+    """
+    return (settings.LLM_PROVIDER or "none").lower()
 
 
-def get_llm():
-    global _llm_singleton
-    if _llm_singleton:
-        return _llm_singleton
-    if LLM_PROVIDER.lower() == "openai":
-        try:
-            from openai import OpenAI
-
-            client = OpenAI()
-
-            class OpenAILLM:
-                def generate(self, system_prompt: str, user_prompt: str) -> str:
-                    rsp = client.chat.completions.create(
-                        model=OPENAI_MODEL,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                        temperature=0,
-                    )
-                    return rsp.choices[0].message.content
-
-            _llm_singleton = OpenAILLM()
-            return _llm_singleton
-        except Exception:
-            pass
-    _llm_singleton = NullLLM()
-    return _llm_singleton
+def get_default_model() -> str:
+    """
+    Return a default model name for the active provider.
+    """
+    prov = get_active_provider()
+    if prov == "openai":
+        return settings.OPENAI_MODEL
+    if prov == "groq":
+        return settings.GROQ_MODEL
+    if prov == "gemini":
+        return settings.GEMINI_MODEL
+    return "offline-none"

@@ -1,4 +1,4 @@
-﻿# src/rag_assistant/api.py
+# src/rag_assistant/api.py
 
 import os
 

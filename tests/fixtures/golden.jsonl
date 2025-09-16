@@ -1,2 +1,2 @@
-{"question":"What is this project?"}
-{"question":"What documents are in this corpus?"}
+{"question": "What is this project about?", "expected_source": "project_overview.md", "expected_substrings": ["RAG", "question answering", "source citations"]}
+{"question": "How do I use this tool?", "expected_source": "usage_notes.md", "expected_substrings": ["ingest", "API", "CLI"]}

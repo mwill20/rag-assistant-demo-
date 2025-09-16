@@ -1,4 +1,4 @@
-﻿# src/rag_assistant/qa.py
+# src/rag_assistant/qa.py
 from __future__ import annotations
 
 import json

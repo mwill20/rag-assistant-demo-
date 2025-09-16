@@ -1,1 +1,1 @@
-RAG Assistant demo corpus. Replace with your real docs.
+﻿Ready Tensor teaches RAG. Phase 5 polishes tests.

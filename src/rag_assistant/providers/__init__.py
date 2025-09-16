@@ -1,55 +1,41 @@
+# src/rag_assistant/providers/__init__.py
+
 from __future__ import annotations
 
-from typing import Any, Iterator, List
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain.retrievers import BM25Retriever, EnsembleRetriever
-from langchain.schema import Document
+from typing import Any
+
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
 
 from ..config import settings
-from .mock import MockProvider
 
-def get_retriever(persist_directory: str, k: int = 2) -> Any:
-    """Get a document retriever configured based on settings."""
+
+def _build_vector_retriever(persist_directory: str, k: int) -> Any:
+    """
+    Create a Chroma retriever with either similarity or MMR search,
+    controlled by settings.USE_MMR. This path is deterministic and
+    does not rely on any external network calls.
+    """
     embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
-    
-    try:
-        vectordb = Chroma(
-            persist_directory=persist_directory,
-            embedding_function=embeddings
-        )
-    except Exception as e:
-        print(f"Warning: Vector store init failed: {e}")
-        return MockRetriever()
-
-    if settings.SEARCH_TYPE == "hybrid":
-        try:
-            bm25_retriever = BM25Retriever.from_documents(
-                vectordb.get(), k=k
-            )
-            vector_retriever = vectordb.as_retriever(
-                search_type="similarity", search_kwargs={"k": k}
-            )
-            return EnsembleRetriever(
-                retrievers=[bm25_retriever, vector_retriever],
-                weights=[0.5, 0.5]
-            )
-        except Exception as e:
-            print(f"Warning: Hybrid search setup failed: {e}")
-    
-    return vectordb.as_retriever(
-        search_type="similarity",
-        search_kwargs={"k": k}
+    vectordb = Chroma(
+        embedding_function=embeddings, persist_directory=persist_directory
     )
 
-class MockRetriever:
-    """Mock retriever for testing."""
-    async def aget_relevant_documents(self, *args, **kwargs) -> List[Document]:
-        return []
-        
-    def get_relevant_documents(self, *args, **kwargs) -> List[Document]:
-        return []
+    search_kwargs = {"k": k}
+    search_type = "mmr" if settings.USE_MMR else "similarity"
 
-def get_provider_stack(preference: str | None = None) -> Iterator[Any]:
-    """Get LLM providers in order of preference."""
-    return iter([MockProvider()])
+    return vectordb.as_retriever(search_type=search_type, search_kwargs=search_kwargs)
+
+
+def get_retriever(persist_directory: str, k: int | None = None) -> Any:
+    """
+    Public factory used by the pipeline/tests.
+
+    Note:
+    - Previously this referenced a `SEARCH_TYPE` flag for hybrid retrieval.
+      To keep CI deterministic and avoid extra dependencies, we default to
+      vector-only retrieval here. If you want hybrid later, wire it up in a
+      separate change (BM25 + EnsembleRetriever) and keep this interface stable.
+    """
+    top_k = int(k or settings.RETRIEVAL_K)
+    return _build_vector_retriever(persist_directory=persist_directory, k=top_k)
