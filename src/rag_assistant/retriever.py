@@ -1,11 +1,10 @@
 ﻿import os
 from functools import lru_cache
-from typing import List
 
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
+from langchain_huggingface import HuggingFaceEmbeddings
 
 DEFAULT_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
@@ -25,8 +24,8 @@ def _bm25_from_storage(persist_directory: str, k: int) -> BM25Retriever:
     # Pull all docs (safe for small local corpora). If your corpus grows large,
     # replace with a lightweight disk-backed text store.
     data = vs.get(limit=100000, include=["documents", "metadatas"])
-    docs: List[Document] = []
-    for text, meta in zip(data.get("documents", []), data.get("metadatas", [])):
+    docs: list[Document] = []
+    for text, meta in zip(data.get("documents", []), data.get("metadatas", []), strict=False):
         docs.append(Document(page_content=text or "", metadata=meta or {}))
     retriever = BM25Retriever.from_documents(docs)
     retriever.k = max(1, k)

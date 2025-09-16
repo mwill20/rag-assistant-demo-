@@ -1,17 +1,20 @@
 ﻿# src/rag_assistant/ingest.py
 
 from pathlib import Path
-from typing import List
 
-from langchain_community.document_loaders import DirectoryLoader, TextLoader, PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+from langchain_community.document_loaders import (
+    DirectoryLoader,
+    PyPDFLoader,
+    TextLoader,
+)
+from langchain_huggingface import HuggingFaceEmbeddings
 
 from .config import settings
 
 
-def _load_documents(data_dir: Path) -> List:
+def _load_documents(data_dir: Path) -> list:
     """Load MD/TXT/PDF from data_dir with encoding autodetect for text files."""
     data_dir = Path(data_dir)
     if not data_dir.exists():
@@ -38,7 +41,7 @@ def _load_documents(data_dir: Path) -> List:
         ),
     ]
 
-    docs: List = []
+    docs: list = []
     for ld in loaders:
         try:
             docs.extend(ld.load())
@@ -68,7 +71,9 @@ def main():
     print(f"[ingest] Created {len(chunks)} chunks")
 
     embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
-    vs = Chroma(embedding_function=embeddings, persist_directory=str(settings.CHROMA_DIR))
+    vs = Chroma(
+        embedding_function=embeddings, persist_directory=str(settings.CHROMA_DIR)
+    )
 
     # Add & persist
     if chunks:

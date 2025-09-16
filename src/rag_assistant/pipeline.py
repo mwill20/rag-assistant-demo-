@@ -1,11 +1,12 @@
 ﻿# src/rag_assistant/pipeline.py
+import json
+import os
+import re
 from pathlib import Path
-import json, re, os
-from typing import List
 
 from .config import settings
-from .retriever import get_retriever
 from .llm_providers import get_provider_stack
+from .retriever import get_retriever
 from .schemas import QAResponse
 
 
@@ -33,7 +34,7 @@ def _strip_code_fences(s: str) -> str:
     return s.strip()
 
 
-def _unique(seq: List[str]) -> List[str]:
+def _unique(seq: list[str]) -> list[str]:
     seen = set()
     out = []
     for x in seq:
@@ -43,7 +44,7 @@ def _unique(seq: List[str]) -> List[str]:
     return out
 
 
-def _extract_sources(docs) -> List[str]:
+def _extract_sources(docs) -> list[str]:
     srcs = []
     for d in docs:
         meta = getattr(d, "metadata", {}) or {}
@@ -58,13 +59,13 @@ def _extract_sources(docs) -> List[str]:
     return _unique(srcs)
 
 
-def _render_text(answer: str, sources: List[str]) -> str:
+def _render_text(answer: str, sources: list[str]) -> str:
     answer = (answer or "").strip()
     cites = "\n".join(f"- {s}" for s in sources) if sources else "None"
     return f"{answer}\n\nSources:\n{cites}"
 
 
-def _coerce_json(raw: str, context: str, sources: List[str]) -> dict:
+def _coerce_json(raw: str, context: str, sources: list[str]) -> dict:
     raw = _strip_code_fences(raw)
     try:
         data = json.loads(raw)
@@ -78,7 +79,7 @@ def _coerce_json(raw: str, context: str, sources: List[str]) -> dict:
     if ans.startswith("Answer using ONLY the CONTEXT below") or (
         "RETURN_FORMAT" in ans and "CONTEXT:" in ans
     ):
-        ans = (context[:600] or "No context found.")
+        ans = context[:600] or "No context found."
 
     if not srcs:
         srcs = sources
@@ -199,4 +200,3 @@ def run_pipeline(question: str, return_format: str | None = None):
             answer = raw_str
         answer = _maybe_force_exact_words(question, answer)
         return _render_text(answer, sources)
-

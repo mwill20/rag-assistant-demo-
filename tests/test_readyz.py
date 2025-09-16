@@ -1,5 +1,7 @@
 ﻿from fastapi.testclient import TestClient
+
 from rag_assistant.api import app
+
 
 def test_readyz_reports_chunks():
     client = TestClient(app)

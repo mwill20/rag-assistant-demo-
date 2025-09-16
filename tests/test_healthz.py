@@ -1,7 +1,9 @@
-﻿import sys
+﻿import subprocess
+import sys
 import time
-import subprocess
+
 import requests
+
 
 def _stop(proc, grace=5):
     if proc.poll() is None:
@@ -11,15 +13,20 @@ def _stop(proc, grace=5):
         except Exception:
             proc.kill()
 
+
 def test_healthz():
     port = 8001
     cmd = [
         sys.executable,
-        "-m", "uvicorn",
+        "-m",
+        "uvicorn",
         "rag_assistant.api:app",
-        "--host", "127.0.0.1",
-        "--port", str(port),
-        "--log-level", "warning",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(port),
+        "--log-level",
+        "warning",
     ]
 
     # Start server
@@ -40,7 +47,12 @@ def test_healthz():
         while time.time() < deadline:
             try:
                 r = requests.get(url, timeout=1.5)
-                if r.status_code == 200 and r.json().get("status") in {"ok", "ready", "healthy", None}:
+                if r.status_code == 200 and r.json().get("status") in {
+                    "ok",
+                    "ready",
+                    "healthy",
+                    None,
+                }:
                     ok = True
                     break
             except Exception as e:
@@ -55,7 +67,8 @@ def test_healthz():
                     logs = proc.stdout.read() or ""
                 except Exception:
                     logs = ""
-            raise AssertionError(f"Uvicorn failed to report healthy in time. Last error: {last_exc}\n--- logs ---\n{logs}")
+            raise AssertionError(
+                f"Uvicorn failed to report healthy in time. Last error: {last_exc}\n--- logs ---\n{logs}"
+            )
     finally:
         _stop(proc, grace=3)
-

@@ -1,17 +1,23 @@
 import os
+
 # Allow answers in smoke test (avoid accidental no-answer)
 os.environ.setdefault("NO_ANSWER_MAX_DIST", "0.99")
 os.environ.setdefault("NO_ANSWER_MIN_MATCH", "1")
 
 
-import subprocess, json, sys, os, pathlib
+import json
+import os
+import pathlib
+import subprocess
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 ENV = os.environ.copy()
 ENV["PYTHONPATH"] = str(ROOT / "src")
 
+
 def run(cmd):
     return subprocess.check_output(cmd, shell=True, env=ENV, cwd=ROOT, text=True)
+
 
 def test_ingest_and_qa():
     run("python -m rag_assistant.ingest")

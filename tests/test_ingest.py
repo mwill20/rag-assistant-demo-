@@ -1,5 +1,7 @@
-from pathlib import Path
-import subprocess, sys, shutil, os
+import shutil
+import subprocess
+import sys
+
 
 def test_ingest_creates_storage(tmp_path, monkeypatch):
     data_dir = tmp_path / "data"
@@ -19,4 +21,3 @@ def test_ingest_creates_storage(tmp_path, monkeypatch):
 
     assert storage_dir.exists(), "Chroma storage dir not created"
     assert any(storage_dir.iterdir()), "Expected Chroma persistence files"
-

@@ -1,16 +1,22 @@
-import os
-import sys
 import json
-import tempfile
+import os
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
+
 
 def _run_mod(module: str, args: list[str], env: dict) -> subprocess.CompletedProcess:
     cmd = [sys.executable, "-m", module] + args
     return subprocess.run(
-        cmd, env=env, text=True,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
+        cmd,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
     )
+
 
 def test_no_answer_fallback():
     """
@@ -18,7 +24,10 @@ def test_no_answer_fallback():
     'No relevant context found.' and returns no sources.
     Uses subprocesses to avoid Windows file-locks.
     """
-    with tempfile.TemporaryDirectory() as data_dir, tempfile.TemporaryDirectory() as store_dir:
+    with (
+        tempfile.TemporaryDirectory() as data_dir,
+        tempfile.TemporaryDirectory() as store_dir,
+    ):
         # Unrelated, tiny corpus
         Path(data_dir, "irrelevant.md").write_text(
             "This corpus talks about llamas and cozy sweaters.\n", encoding="utf-8"

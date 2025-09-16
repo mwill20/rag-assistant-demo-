@@ -1,9 +1,12 @@
 ﻿import json
 from pathlib import Path
+
 from fastapi.testclient import TestClient
+
 from rag_assistant.api import app
 
 KNOWN = {"project_overview.md", "usage_notes.md", "dummy.md"}
+
 
 def _load_golden():
     items = []
@@ -14,6 +17,7 @@ def _load_golden():
             if line:
                 items.append(json.loads(line))
     return items
+
 
 def test_answers_cite_known_sources():
     client = TestClient(app)

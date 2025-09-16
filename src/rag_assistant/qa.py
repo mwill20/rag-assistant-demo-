@@ -1,10 +1,13 @@
 ﻿# src/rag_assistant/qa.py
 from __future__ import annotations
-import os, sys, json
-from typing import Tuple, List
 
-from langchain_huggingface import HuggingFaceEmbeddings
+import json
+import os
+import sys
+
 from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+
 from .config import settings  # expects EMBEDDING_MODEL, CHROMA_DIR
 
 
@@ -15,7 +18,9 @@ def _build_retriever(vs, k: int):
       FETCH_K (MMR candidates, default 20)
       MMR_LAMBDA (diversity vs relevance, default 0.5)
     """
-    search_type = (os.getenv("SEARCH_TYPE") or os.getenv("RETRIEVAL_MODE") or "similarity").lower()
+    search_type = (
+        os.getenv("SEARCH_TYPE") or os.getenv("RETRIEVAL_MODE") or "similarity"
+    ).lower()
     if search_type == "mmr":
         fetch_k = int(os.getenv("FETCH_K", "20"))
         mmr_lambda = float(os.getenv("MMR_LAMBDA", "0.5"))
@@ -26,7 +31,7 @@ def _build_retriever(vs, k: int):
     return vs.as_retriever(search_kwargs={"k": k})
 
 
-def run_qa(question: str, k: int = 2) -> Tuple[str, List[str]]:
+def run_qa(question: str, k: int = 2) -> tuple[str, list[str]]:
     """
     Retrieve top-k chunks and return (answer_text, sources).
     Extractive by default (stitches retrieved chunks).
@@ -47,7 +52,9 @@ def run_qa(question: str, k: int = 2) -> Tuple[str, List[str]]:
     sources = [d.metadata.get("source", "?") for d in docs]
 
     # Tunables (generous defaults so tests/demos don’t trip the guard)
-    max_dist = float(os.getenv("NO_ANSWER_MAX_DIST", "1.25"))  # cosine distance can be up to ~2
+    max_dist = float(
+        os.getenv("NO_ANSWER_MAX_DIST", "1.25")
+    )  # cosine distance can be up to ~2
     min_chars = int(os.getenv("NO_ANSWER_MIN_CHARS", "80"))
 
     # Try to get a top distance; if unavailable, don’t block

@@ -1,14 +1,22 @@
-import os
-import sys
 import json
-import tempfile
+import os
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
+
 
 def _run_mod(module: str, args: list[str], env: dict) -> subprocess.CompletedProcess:
     cmd = [sys.executable, "-m", module] + args
-    return subprocess.run(cmd, env=env, text=True,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+    return subprocess.run(
+        cmd,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+    )
+
 
 def test_golden_minicorpus():
     """
@@ -16,8 +24,10 @@ def test_golden_minicorpus():
     - Use separate processes for ingest and QA to avoid file locks.
     - Assert known phrase and citation of mini.md.
     """
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as data_dir, \
-         tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as store_dir:
+    with (
+        tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as data_dir,
+        tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as store_dir,
+    ):
 
         # Create tiny corpus
         mini = Path(data_dir) / "mini.md"
@@ -52,5 +62,3 @@ def test_golden_minicorpus():
         assert any(Path(s).name == "mini.md" for s in sources)
         assert answer.strip()
         assert len(sources) >= 1
-
-
