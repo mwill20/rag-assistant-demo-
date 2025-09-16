@@ -7,6 +7,7 @@ from langchain.retrievers import BM25Retriever, EnsembleRetriever
 from langchain.schema import Document
 
 from ..config import settings
+from .mock import MockProvider
 
 def get_retriever(persist_directory: str, k: int = 2) -> Any:
     """Get a document retriever configured based on settings."""
@@ -19,7 +20,6 @@ def get_retriever(persist_directory: str, k: int = 2) -> Any:
         )
     except Exception as e:
         print(f"Warning: Vector store init failed: {e}")
-        # Return minimal retriever for tests
         return MockRetriever()
 
     if settings.SEARCH_TYPE == "hybrid":
@@ -52,5 +52,4 @@ class MockRetriever:
 
 def get_provider_stack(preference: str | None = None) -> Iterator[Any]:
     """Get LLM providers in order of preference."""
-    from .mock import MockProvider
     return iter([MockProvider()])
