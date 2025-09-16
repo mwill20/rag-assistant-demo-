@@ -27,3 +27,6 @@ data/*
 !.env_example
 *.egg-info/
 /.env
+# RAG vector store (do not version)
+storage/
+!storage/.gitkeep
