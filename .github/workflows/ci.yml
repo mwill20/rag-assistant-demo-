@@ -53,17 +53,32 @@ jobs:
               print('Prefetch warning:', e)
           "
 
-      - name: Create test data
+      # Seed demo data & system prompt (Linux/macOS)
+      - name: Seed data & prompt (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
           mkdir -p data
-          echo "Test content" > data/test.txt
+          printf "Ready Tensor teaches RAG. Phase 5 polishes tests.\n" > data/dummy.md
+          printf "You are a concise RAG assistant. Cite sources when possible.\n" > system_prompt.txt
           mkdir -p storage
+
+      # Seed demo data & system prompt (Windows)
+      - name: Seed data & prompt (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path data | Out-Null
+          Set-Content -Encoding UTF8 -NoNewline -Path data\dummy.md -Value "Ready Tensor teaches RAG. Phase 5 polishes tests."
+          Set-Content -Encoding UTF8 -NoNewline -Path system_prompt.txt -Value "You are a concise RAG assistant. Cite sources when possible."
+          New-Item -ItemType Directory -Force -Path storage | Out-Null
 
       - name: Ingest demo corpus
         run: python -m rag_assistant.ingest
 
       - name: Run tests
         run: pytest -q
+
 
 
 
