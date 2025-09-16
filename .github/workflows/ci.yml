@@ -53,9 +53,11 @@ jobs:
               print('Prefetch warning:', e)
           "
 
-      - name: Create directories
+      - name: Create test data
         run: |
-          mkdir -p data storage
+          mkdir -p data
+          echo "Test content" > data/test.txt
+          mkdir -p storage
 
       - name: Ingest demo corpus
         run: python -m rag_assistant.ingest
