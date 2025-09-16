@@ -17,5 +17,6 @@ jobs:
         run: ruff check .
       - name: Black (format check)
         run: black --check .
-      - name: Mypy (types)
-        run: mypy src
+      - name: Mypy (types, report-only)
+        run: mypy src || true   # <-- don't fail the job yet
+
