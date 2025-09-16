@@ -1,4 +1,6 @@
 line-length = 100
 target-version = "py311"
-select = ["E", "F", "I", "UP", "B"]  # pyflakes/pycodestyle/imports/pyupgrade/bugbear
-ignore = ["E501"]                    # don’t fail on long lines (Black handles wrapping)
+
+[lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501", "UP022"]  # long lines handled by Black; UP022 is optional
