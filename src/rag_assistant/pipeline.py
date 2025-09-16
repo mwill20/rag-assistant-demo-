@@ -3,19 +3,18 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
 
-from pydantic import BaseModel
 from langchain.schema import Document
+from pydantic import BaseModel
 
 from .config import settings
-from .providers import get_retriever
 from .llm_providers import safe_complete
+from .providers import get_retriever
 
 
 class PipelineResult(BaseModel):
     answer: str
-    sources: List[str]
+    sources: list[str]
 
 
 def _load_system_prompt() -> str:
@@ -32,13 +31,13 @@ def _load_system_prompt() -> str:
     return "You are a concise RAG assistant. Cite sources when possible."
 
 
-def _prepare_context(question: str, k: int) -> Tuple[str, List[str]]:
+def _prepare_context(question: str, k: int) -> tuple[str, list[str]]:
     """
     Retrieve top-k documents and return a stitched context plus their source paths.
     Deterministic, no network calls required.
     """
     retriever = get_retriever(persist_directory=settings.CHROMA_DIR, k=k)
-    docs: List[Document] = retriever.get_relevant_documents(question)
+    docs: list[Document] = retriever.get_relevant_documents(question)
 
     stitched = "\n".join(d.page_content for d in docs if d.page_content)
     sources = [str(d.metadata.get("source", "?")) for d in docs]
@@ -70,7 +69,7 @@ def _answer_with_llm(system_prompt: str, question: str, context: str) -> str:
     return completion or _answer_offline(context)
 
 
-def run_pipeline(question: str, *, return_format: str = "json") -> Dict[str, Any]:
+def run_pipeline(question: str, *, return_format: str = "json") -> dict[str, object]:
     """
     Main entry used by the API and tests.
     - Retrieves top-k docs
