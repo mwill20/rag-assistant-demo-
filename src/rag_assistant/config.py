@@ -14,18 +14,21 @@ def _env(key: str, default: str) -> str:
 @dataclass(frozen=True)
 class Settings:
     # Paths
-    DATA_DIR: str = _env("DATA_DIR", str(Path("data")))
-    CHROMA_DIR: str = _env("CHROMA_DIR", str(Path("storage")))
+    DATA_DIR: str = _env("DATA_DIR", str(Path("data").resolve()))
+    CHROMA_DIR: str = _env("CHROMA_DIR", str(Path("storage").resolve()))
 
-    # Embeddings
-    EMBEDDING_MODEL: str = _env(
-        "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
+    # Search settings
+    SEARCH_TYPE: str = _env("SEARCH_TYPE", "similarity")
+
+    # System prompt configuration
+    SYSTEM_PROMPT_PATH: str = _env(
+        "SYSTEM_PROMPT_PATH", 
+        str(Path("system_prompt.txt").resolve())
     )
 
-    # LLM provider knobs (used by llm.py)
-    LLM_PROVIDER: str = _env("LLM_PROVIDER", "none")  # "openai" | "groq" | "none"
+    # LLM provider settings
+    LLM_PROVIDER: str = _env("LLM_PROVIDER", "groq")
     OPENAI_MODEL: str = _env("OPENAI_MODEL", "gpt-4o-mini")
-    GROQ_MODEL: str = _env("GROQ_MODEL", "llama-3.1-8b-instant")
 
 
 settings = Settings()

@@ -1,26 +1,23 @@
-﻿# src/rag_assistant/pipeline.py
+﻿from __future__ import annotations
 import json
 import os
 import re
 from pathlib import Path
 
 from .config import settings
-from .llm_providers import get_provider_stack
-from .retriever import get_retriever
-from .schemas import QAResponse
+
+_DEF_PROMPT = (
+    "You are a helpful RAG assistant. Use only the provided context. "
+    "Cite file paths you used in a 'sources' list."
+)
 
 
 def _load_system_prompt() -> str:
     sp = Path(settings.SYSTEM_PROMPT_PATH)
-    if sp.is_dir():
-        sp = sp / "system_prompt.txt"
     try:
-        return sp.read_text(encoding="utf-8")
+        return sp.read_text(encoding="utf-8").strip()
     except Exception:
-        return (
-            "You are a precise RAG assistant. Use only the provided CONTEXT. "
-            "If context is insufficient, say so. Never fabricate sources."
-        )
+        return _DEF_PROMPT
 
 
 def _strip_code_fences(s: str) -> str:
