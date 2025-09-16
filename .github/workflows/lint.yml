@@ -1,0 +1,21 @@
+name: Lint & Types
+on: [push, pull_request]
+jobs:
+  lint-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install tools
+        run: |
+          python -m pip install -U pip
+          pip install ruff black mypy
+      - name: Ruff (lint)
+        run: ruff check .
+      - name: Black (format check)
+        run: black --check .
+      - name: Mypy (types)
+        run: mypy src
