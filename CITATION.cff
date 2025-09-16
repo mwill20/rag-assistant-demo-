@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+title: "RAG Assistant Demo"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - family-names: Williams
+    given-names: Michael
+identifiers:
+  - type: url
+    value: "https://github.com/mwill20/rag-assistant-demo-"
+repository-code: "https://github.com/mwill20/rag-assistant-demo-"
+version: "0.1.0"
+date-released: "2025-09-16"
+license: "MIT"

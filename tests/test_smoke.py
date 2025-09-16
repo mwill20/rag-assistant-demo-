@@ -1,3 +1,9 @@
+import os
+# Allow answers in smoke test (avoid accidental no-answer)
+os.environ.setdefault("NO_ANSWER_MAX_DIST", "0.99")
+os.environ.setdefault("NO_ANSWER_MIN_MATCH", "1")
+
+
 import subprocess, json, sys, os, pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
