@@ -38,8 +38,10 @@ jobs:
           python -m pip install -U pip
           # Try dev extras first; fall back to base install
           pip install -e ".[dev]" || pip install -e .
-          # Ensure API-test deps are present
-          pip install fastapi uvicorn pytest requests httpx sentence-transformers
+          # Ensure API-test + LangChain split deps
+          pip install fastapi uvicorn pytest requests httpx sentence-transformers \
+                    langchain-chroma langchain-huggingface chromadb
+
 
 
       - name: Prefetch embedding model (portable)
