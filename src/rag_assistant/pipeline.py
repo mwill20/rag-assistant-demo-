@@ -4,12 +4,12 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel
 
 from .config import settings
 from .providers import get_provider_stack, get_retriever
+
 
 class QAResponse(BaseModel):
     answer: str

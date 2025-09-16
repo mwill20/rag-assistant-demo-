@@ -35,23 +35,27 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install -U pip
-          pip install -e ".[dev]" || pip install -e .
+          pip install -e ".[dev]"
           pip install pytest requests httpx fastapi uvicorn
           pip install sentence-transformers
           pip install langchain langchain-community langchain-chroma chromadb
           pip install langchain-huggingface
 
       - name: Prefetch embedding model (best-effort)
-        if: runner.os == 'Linux'  # Only run on Linux
+        if: runner.os == 'Linux'
         run: |
-          python3 -c "
+          python -c "
+          from sentence_transformers import SentenceTransformer
           try:
-              from sentence_transformers import SentenceTransformer
-              SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+              model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
               print('Prefetch OK')
           except Exception as e:
               print('Prefetch warning:', e)
           "
+
+      - name: Create directories
+        run: |
+          mkdir -p data storage
 
       - name: Ingest demo corpus
         run: python -m rag_assistant.ingest
