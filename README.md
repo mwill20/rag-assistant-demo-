@@ -189,21 +189,95 @@ python -m rag_assistant.qa "How do I run the API?"
 python -m rag_assistant.qa --text "Summarize this project in exactly 12 words"
 - The CLI respects “exactly N words” constraints via a post-formatting guard.
 
-# API Usage
-Run the server:
+## API: `/ask` response (now includes retrieval scores)
+
+The `/ask` endpoint returns both:
+- **`sources`**: legacy list of file paths (strings) for backward compatibility.
+- **`sources_scored`**: richer objects including cosine distance scores.
+
+### Example request
+```powershell
+# Run the API locally in a separate terminal:
+#   uvicorn rag_assistant.api:app --reload
+# Then, from PowerShell:
+$body = @{ question = "What is this project?" } | ConvertTo-Json
+Invoke-RestMethod http://127.0.0.1:8000/ask -Method POST -Body $body -ContentType "application/json" | ConvertTo-Json -Depth 5
+
+### Example response
+{
+  "answer": "RAG assistant ingests local docs and synthesizes answers from retrieved chunks.",
+  "sources": [
+    "C:\\path\\to\\repo\\data\\project_overview.md",
+    "C:\\path\\to\\repo\\data\\usage_notes.md"
+  ],
+  "sources_scored": [
+    {
+      "path": "C:\\path\\to\\repo\\data\\project_overview.md",
+      "page": null,
+      "metric": "cosine",
+      "score_type": "distance",
+      "score": 1.53
+    },
+    {
+      "path": "C:\\path\\to\\repo\\data\\usage_notes.md",
+      "page": null,
+      "metric": "cosine",
+      "score_type": "distance",
+      "score": 1.62
+    }
+  ]
+}
+
+### How to interpret scores
+
+- We expose cosine distance (not raw similarity).
+- Lower is better: 0.0 means vectors are identical; larger values mean farther apart.
+- If you compare to “cosine similarity” in other tools, remember:
+    - distance ≈ 1 − similarity
+    - High similarity → low distance.
+
+ Tip: Pair scores with debug views (e.g. top-k chunks) to evaluate retrieval quality and spot weak matches.
+
+# Optional UI (Streamlit)
+A minimal web UI is included for local demos. It talks to the FastAPI /ask endpoint, so session memory, deep links, and scores work as-is.
+
+## Run
+### Terminal 1: start API
 uvicorn rag_assistant.api:app --reload
 
-Endpoints:
-- GET /healthz – fast, dependency-light health probe.
-- POST /ask – body: {"question": "..."}; returns JSON with answer and sources.
+### Terminal 2: launch UI (repo root)
+streamlit run .\ui.py
 
-Example (PowerShell):
-Invoke-RestMethod http://127.0.0.1:8000/healthz
+- Default API base: http://127.0.0.1:8000. Change via:
 
-Invoke-RestMethod http://127.0.0.1:8000/ask -Method Post `
-  -Headers @{Accept="application/json"} `
-  -ContentType "application/json" `
-  -Body (@{question="How do I run the API?"} | ConvertTo-Json)
+  - $env:RAG_API_BASE = "http://127.0.0.1:8001"
+  - streamlit run .\ui.py
+
+### Features
+- Question box → answer with cited sources
+- sources_scored table with cosine distance (lower = closer)
+- Clickable file:// deep links (PDFs include #page=N)
+- Session memory via session_id (in-memory; resets on restart)
+- Optional doc upload (PDF/MD/TXT) → saved to ./data/ → auto-ingest
+
+![UI screenshot](docs/ui_screenshot.png)
+
+## Session Memory (Summarize-then-Trim)
+
+The `/ask` endpoint now supports multi-turn conversations with a `session_id`.
+
+- Each session maintains a rolling memory of Q&A turns.  
+- When the session grows beyond 5 turns, the oldest turns are **summarized** into a compact form before being trimmed.  
+- This ensures the assistant remembers context across questions without blowing up the prompt size.  
+- If no `session_id` is provided, the server generates one and returns it in the response.
+
+### Example: Multi-turn conversation
+```powershell
+# Start a new session
+$body = @{ question = "What is this project?" } | ConvertTo-Json
+$response = Invoke-RestMethod http://127.0.0.1:8000/ask -Method POST -Body $body -ContentType "application/json"
+$response.session_id
+
 
 # Testing & Quality
 Local:
