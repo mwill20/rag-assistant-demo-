@@ -47,12 +47,12 @@ def readyz():
 
 @app.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest):
-    # Lazy import so server starts instantly; heavy deps load only when /ask is called
-    from .pipeline import run_pipeline
+    # Use QA path with scores; keep the same response envelope
+    from .qa import run_qa
 
-    result = run_pipeline(req.question, return_format="json")
-    return AskResponse(**result)
-
+    answer, sources = run_qa(req.question, include_scores=True)
+    payload = {"answer": answer, "sources": sources}
+    return AskResponse(**payload)
 
 @app.get("/healthz")
 def healthz():
