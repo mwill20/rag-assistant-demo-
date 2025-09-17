@@ -23,16 +23,12 @@ class PipelineResult(BaseModel):
 
 
 def _load_system_prompt() -> str:
-    """
-    Load system prompt from settings.SYSTEM_PROMPT_PATH.
-    Falls back to a safe, minimal prompt if the file is missing.
-    """
     path = Path(settings.SYSTEM_PROMPT_PATH)
     if path.is_file():
         try:
             return path.read_text(encoding="utf-8").strip()
         except Exception:
-            pass  # fall through to default
+            pass
     return "You are a concise RAG assistant. Cite sources when possible."
 
 
@@ -46,17 +42,11 @@ _MIN_CHARS = int(os.getenv("NO_ANSWER_MIN_CHARS", "80"))
 
 
 def _robust_complete(prompt: str) -> str:
-    """
-    Wrap the existing safe_complete with retry + basic timeout.
-    Timeout is enforced as a soft wall-clock budget per attempt.
-    """
     last_err: Exception | None = None
-    # retries=N means up to N+1 attempts total
     for attempt in range(1, _SAFE_RETRIES + 2):
         start = time.time()
         try:
-            result = safe_complete(prompt)
-            return result
+            return safe_complete(prompt)
         except Exception as e:
             last_err = e
         elapsed = time.time() - start
@@ -68,8 +58,6 @@ def _robust_complete(prompt: str) -> str:
             time.sleep(_SAFE_RETRY_DELAY)
         else:
             break
-
-    # Final fallback: never crash the pipeline; provide a safe response
     return (
         "I couldn’t complete the generation step reliably. "
         "Based on the provided documents, I don’t have a supported answer."
@@ -77,10 +65,6 @@ def _robust_complete(prompt: str) -> str:
 
 
 def _prepare_context(question: str, k: int) -> tuple[str, list[str]]:
-    """
-    Retrieve top-k documents and return a stitched context plus their source paths.
-    Deterministic, no network calls required.
-    """
     retriever = get_retriever(persist_directory=settings.CHROMA_DIR, k=k)
     results = retriever.vectorstore.similarity_search_with_score(question, k=k)
     docs = [doc for (doc, _score) in results]
@@ -89,53 +73,69 @@ def _prepare_context(question: str, k: int) -> tuple[str, list[str]]:
     return stitched.strip(), sources
 
 
-def _answer_offline(stitched_context: str) -> str:
+def _answer_offline(effective_context: str) -> str:
     """
     Offline/extractive fallback when no LLM provider is configured.
+    We now return the EFFECTIVE context (session memory + retrieved text).
     """
-    if stitched_context:
-        return stitched_context
+    if effective_context:
+        return effective_context
     return "No answer found in the indexed documents."
 
 
-def _answer_with_llm(system_prompt: str, question: str, context: str, sources: list[str]) -> str:
-    """
-    Use the configured LLM provider if available (safe_complete handles 'none').
-    Includes stop-condition checks to avoid wasteful or hallucinatory calls.
-    """
-    if not sources:
-        logger.warning("Stop-condition triggered: no documents retrieved.")
+def _answer_with_llm(
+    system_prompt: str,
+    question: str,
+    context: str,
+    sources: list[str],
+    session_context: str | None = None,
+) -> str:
+    mem = (session_context or "").strip()
+    mem_len = len(mem)
+
+    if not sources and mem_len == 0:
+        logger.warning("Stop-condition: no documents and no session memory.")
         return "I don’t know based on the provided documents."
 
-    if len(context) < _MIN_CHARS:
+    if (len(context) + mem_len) < _MIN_CHARS:
         logger.warning(
-            f"Stop-condition triggered: context too short ({len(context)} chars < {_MIN_CHARS})."
+            f"Stop-condition: combined context too short ({len(context)+mem_len} < {_MIN_CHARS})."
         )
         return "I don’t know based on the provided documents."
 
+    # Build the prompt, including session memory if present
+    session_block = f"SESSION MEMORY:\n{mem}\n\n" if mem else ""
     prompt = (
         f"{system_prompt}\n\n"
-        "Given the CONTEXT below, answer the QUESTION concisely.\n\n"
+        "Given the (optional) SESSION MEMORY and the retrieved CONTEXT below, answer the QUESTION concisely.\n\n"
+        f"{session_block}"
         f"CONTEXT:\n{context}\n\n"
         f"QUESTION: {question}\n"
         "ANSWER:"
     )
     completion = _robust_complete(prompt).strip()
-    return completion or _answer_offline(context)
+
+    # Offline fallback should include memory + retrieval so users see the effect
+    effective_context = (session_block + f"CONTEXT:\n{context}").strip()
+    return completion or _answer_offline(effective_context)
 
 
-def run_pipeline(question: str, *, return_format: str = "json") -> dict[str, object]:
-    """
-    Main entry used by the API and tests.
-    - Retrieves top-k docs
-    - Produces an answer via offline stitching or LLM (if configured)
-    """
+def run_pipeline(
+    question: str,
+    *,
+    return_format: str = "json",
+    session_context: str | None = None,
+) -> dict[str, object]:
     system_prompt = _load_system_prompt()
     context, sources = _prepare_context(question, k=settings.RETRIEVAL_K)
 
-    answer = _answer_with_llm(system_prompt, question, context, sources)
+    answer = _answer_with_llm(
+        system_prompt,
+        question,
+        context,
+        sources,
+        session_context=session_context,
+    )
     result = PipelineResult(answer=answer, sources=sources)
-
-    if return_format.lower() == "json":
-        return result.model_dump()
     return result.model_dump()
+
