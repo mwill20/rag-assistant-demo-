@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from pathlib import Path
 
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -31,6 +32,22 @@ def _build_retriever(vs, k: int):
     return vs.as_retriever(search_kwargs={"k": k})
 
 
+def _make_href(path: str, page: int | None = None) -> str:
+    """
+    Build a clickable href for local files.
+    - .pdf => file://...#page={page}
+    - .md/.txt => file://... (could later add anchors if we track offsets)
+    - default => file://path
+    """
+    try:
+        norm = Path(path).resolve().as_uri()
+    except Exception:
+        return path
+    if path.lower().endswith(".pdf") and page:
+        return f"{norm}#page={page}"
+    return norm
+
+
 def run_qa(question: str, k: int = 2, include_scores: bool = False) -> tuple[str, list]:
     """
     Retrieve top-k chunks and return (answer_text, sources).
@@ -38,7 +55,7 @@ def run_qa(question: str, k: int = 2, include_scores: bool = False) -> tuple[str
     Default behavior (include_scores=False):
       - Returns sources as a list[str] (paths), preserving existing callers/tests.
     When include_scores=True:
-      - Returns sources as a list[dict] with: path, page, metric, score_type, score.
+      - Returns sources as a list[dict] with: path, page, metric, score_type, score, href.
 
     Safer 'no-answer' heuristic: only refuse when we both
     (a) retrieve nothing useful AND (b) the top distance is very poor.
@@ -65,7 +82,7 @@ def run_qa(question: str, k: int = 2, include_scores: bool = False) -> tuple[str
     if not include_scores:
         sources = [str(d.metadata.get("source", "?")) for d in docs]
     else:
-        # Structured sources with raw scores
+        # Structured sources with raw scores + deep links
         sources = []
         for doc, score in results:
             src = str(doc.metadata.get("source", "?"))
@@ -76,6 +93,7 @@ def run_qa(question: str, k: int = 2, include_scores: bool = False) -> tuple[str
                 "metric": "cosine",
                 "score_type": "distance",  # lower is better (0 = identical)
                 "score": float(score),
+                "href": _make_href(src, page),
             })
 
     # Tunables (generous defaults so tests/demos don’t trip the guard)
@@ -100,3 +118,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
