@@ -334,3 +334,33 @@ Examples of unacceptable behavior:
 ## Attribution
 
 This Code of Conduct is adapted from the [Contributor Covenant](https://www.contributor-covenant.org/).
+## Retrieval & Similarity (RAG internals)
+
+**Vector store:** Chroma  
+**Similarity metric:** Cosine similarity  
+**Top-K (`k`):** 2 (by default in our retriever)  
+**Chunking:** 500 characters, 50 overlap (~10%)
+
+### What is cosine similarity?
+Cosine similarity measures the angle between two vectors (here: embeddings).  
+- Range: **-1 to 1**  
+- **1.0** ⇒ identical direction (most similar)  
+- **0.0** ⇒ unrelated/orthogonal  
+- **-1.0** ⇒ opposite direction
+
+Frameworks may report either **similarity** or **distance**:
+- If you see **similarity**, **higher is better** (closer to 1).  
+- If you see **distance = 1 − cosine_similarity**, **lower is better** (closer to 0).
+
+### How we use it here
+- We index chunks in Chroma and retrieve the **top-k=2** most similar chunks by **cosine similarity**.  
+- Answers are grounded in those chunks and we cite sources.  
+- If no chunk is sufficiently relevant, the system responds: “I don’t know based on the provided documents.”
+
+### Practical assessment
+- Expect good matches to have **cosine similarity ≳ 0.3–0.5** for short factual queries (rough heuristic; varies by corpus).  
+- If you ever inspect scores (via custom logging or debugging code), remember:
+  - **Similarity** near **1.0** ⇒ excellent match; near **0.0** ⇒ weak; negative ⇒ contradictory/noise.
+  - If your tooling shows **distance** instead, invert your intuition: **0 is best**, larger is worse.
+
+> Note: Our retriever currently returns documents (not raw scores) in the main pipeline. For deeper debugging, you can temporarily log scores from the underlying vector store client.
