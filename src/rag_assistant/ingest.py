@@ -66,7 +66,7 @@ def main():
         print("[ingest] No documents found. Put files in ./data and re-run.")
         return
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=60)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     chunks = splitter.split_documents(docs)
     print(f"[ingest] Created {len(chunks)} chunks")
 
