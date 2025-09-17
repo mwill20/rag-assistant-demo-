@@ -1,6 +1,7 @@
 # src/rag_assistant/api.py
 
 import os
+from typing import Optional, Literal
 
 from fastapi import FastAPI
 from langchain_chroma import Chroma
@@ -10,15 +11,28 @@ from pydantic import BaseModel
 app = FastAPI(title="RAG Assistant API", version="0.1.0")
 
 
+# ----- Schemas -----
 class AskRequest(BaseModel):
     question: str
 
 
+class SourceScored(BaseModel):
+    path: str
+    page: Optional[int | str] = None
+    metric: Literal["cosine"] = "cosine"
+    score_type: Literal["distance"] = "distance"  # lower is better
+    score: float
+
+
 class AskResponse(BaseModel):
     answer: str
+    # Legacy field kept for backward compatibility and tests:
     sources: list[str]
+    # New field with raw retrieval scores (cosine distance):
+    sources_scored: Optional[list[SourceScored]] = None
 
 
+# ----- Endpoints -----
 @app.get("/readyz")
 def readyz():
     """
@@ -47,13 +61,25 @@ def readyz():
 
 @app.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest):
-    # Use QA path with scores; keep the same response envelope
+    # Use QA path with scores; keep legacy sources list[str] too
     from .qa import run_qa
 
-    answer, sources = run_qa(req.question, include_scores=True)
-    payload = {"answer": answer, "sources": sources}
+    answer, sources_scored = run_qa(req.question, include_scores=True)
+
+    # Derive legacy sources (paths-only) from scored items
+    sources_paths = (
+        [item.get("path", "?") for item in sources_scored] if isinstance(sources_scored, list) else []
+    )
+
+    payload = {
+        "answer": answer,
+        "sources": sources_paths,
+        "sources_scored": sources_scored,
+    }
     return AskResponse(**payload)
+
 
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
+
