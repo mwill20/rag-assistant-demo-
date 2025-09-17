@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import time
+import logging
 from pathlib import Path
 
 from langchain.schema import Document
@@ -12,6 +13,8 @@ from pydantic import BaseModel
 from .config import settings
 from .llm_providers import safe_complete
 from .providers import get_retriever
+
+logger = logging.getLogger("rag-assistant")
 
 
 class PipelineResult(BaseModel):
@@ -38,6 +41,9 @@ _SAFE_RETRIES = int(os.getenv("SAFE_COMPLETE_MAX_RETRIES", "2"))
 _SAFE_TIMEOUT = float(os.getenv("SAFE_COMPLETE_TIMEOUT", "10.0"))  # seconds
 _SAFE_RETRY_DELAY = float(os.getenv("SAFE_COMPLETE_RETRY_DELAY", "0.75"))  # seconds
 
+# Stop-condition knobs
+_MIN_CHARS = int(os.getenv("NO_ANSWER_MIN_CHARS", "80"))
+
 
 def _robust_complete(prompt: str) -> str:
     """
@@ -49,12 +55,10 @@ def _robust_complete(prompt: str) -> str:
     for attempt in range(1, _SAFE_RETRIES + 2):
         start = time.time()
         try:
-            # If a provider supports a native timeout param, pass it via safe_complete.
             result = safe_complete(prompt)
             return result
         except Exception as e:
             last_err = e
-        # Soft timeout check (no provider-side cancellation)
         elapsed = time.time() - start
         if elapsed > _SAFE_TIMEOUT:
             last_err = TimeoutError(
@@ -76,44 +80,39 @@ def _prepare_context(question: str, k: int) -> tuple[str, list[str]]:
     """
     Retrieve top-k documents and return a stitched context plus their source paths.
     Deterministic, no network calls required.
-
-    Note:
-    - Uses similarity_search_with_score() so we *can* expose raw scores at higher layers
-      (API/CLI) without changing this function's return type.
     """
     retriever = get_retriever(persist_directory=settings.CHROMA_DIR, k=k)
-
-    # OLD (no scores):
-    # docs: list[Document] = retriever.invoke(question)
-
-    # NEW (with scores available):
     results = retriever.vectorstore.similarity_search_with_score(question, k=k)
-    # results: list[tuple[Document, float]]  # cosine *distance* (lower is better)
-
-    # Keep original return contract: stitched context + list of source paths
     docs = [doc for (doc, _score) in results]
     stitched = "\n".join(d.page_content for d in docs if d.page_content)
-
-    # Keep sources as plain paths here to avoid changing callers/tests
     sources = [str(d.metadata.get("source", "?")) for d in docs]
-
     return stitched.strip(), sources
 
 
 def _answer_offline(stitched_context: str) -> str:
     """
     Offline/extractive fallback when no LLM provider is configured.
-    Returns the stitched context directly or a safe no-answer message.
     """
     if stitched_context:
         return stitched_context
     return "No answer found in the indexed documents."
 
 
-def _answer_with_llm(system_prompt: str, question: str, context: str) -> str:
+def _answer_with_llm(system_prompt: str, question: str, context: str, sources: list[str]) -> str:
     """
     Use the configured LLM provider if available (safe_complete handles 'none').
+    Includes stop-condition checks to avoid wasteful or hallucinatory calls.
     """
+    if not sources:
+        logger.warning("Stop-condition triggered: no documents retrieved.")
+        return "I don’t know based on the provided documents."
+
+    if len(context) < _MIN_CHARS:
+        logger.warning(
+            f"Stop-condition triggered: context too short ({len(context)} chars < {_MIN_CHARS})."
+        )
+        return "I don’t know based on the provided documents."
+
     prompt = (
         f"{system_prompt}\n\n"
         "Given the CONTEXT below, answer the QUESTION concisely.\n\n"
@@ -121,8 +120,6 @@ def _answer_with_llm(system_prompt: str, question: str, context: str) -> str:
         f"QUESTION: {question}\n"
         "ANSWER:"
     )
-    # Use robust wrapper (retries + soft timeout). Our tests that monkeypatch
-    # pipeline.safe_complete still work because this calls safe_complete() inside.
     completion = _robust_complete(prompt).strip()
     return completion or _answer_offline(context)
 
@@ -132,15 +129,13 @@ def run_pipeline(question: str, *, return_format: str = "json") -> dict[str, obj
     Main entry used by the API and tests.
     - Retrieves top-k docs
     - Produces an answer via offline stitching or LLM (if configured)
-    - Returns {'answer': str, 'sources': List[str]}
     """
     system_prompt = _load_system_prompt()
     context, sources = _prepare_context(question, k=settings.RETRIEVAL_K)
 
-    # Try LLM first; safe_complete returns "" when provider is 'none'
-    answer = _answer_with_llm(system_prompt, question, context)
-
+    answer = _answer_with_llm(system_prompt, question, context, sources)
     result = PipelineResult(answer=answer, sources=sources)
+
     if return_format.lower() == "json":
         return result.model_dump()
     return result.model_dump()
