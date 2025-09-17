@@ -43,7 +43,7 @@ def run_qa(question: str, k: int = 2) -> tuple[str, list[str]]:
 
     # Build retriever (MMR toggle supported)
     retriever = _build_retriever(vs, k=k)
-    docs = retriever.get_relevant_documents(question)
+    docs = retriever.invoke(question)
 
     if not docs:
         return "No relevant context found.", []
