@@ -37,7 +37,7 @@ def _prepare_context(question: str, k: int) -> tuple[str, list[str]]:
     Deterministic, no network calls required.
     """
     retriever = get_retriever(persist_directory=settings.CHROMA_DIR, k=k)
-    docs: list[Document] = retriever.get_relevant_documents(question)
+    docs: list[Document] = retriever.invoke(question)
 
     stitched = "\n".join(d.page_content for d in docs if d.page_content)
     sources = [str(d.metadata.get("source", "?")) for d in docs]
