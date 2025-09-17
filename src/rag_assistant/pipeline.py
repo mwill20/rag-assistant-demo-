@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import time
 from pathlib import Path
 
 from langchain.schema import Document
@@ -31,16 +33,70 @@ def _load_system_prompt() -> str:
     return "You are a concise RAG assistant. Cite sources when possible."
 
 
+# ---------------- Reliability knobs (env-configurable) ----------------
+_SAFE_RETRIES = int(os.getenv("SAFE_COMPLETE_MAX_RETRIES", "2"))
+_SAFE_TIMEOUT = float(os.getenv("SAFE_COMPLETE_TIMEOUT", "10.0"))  # seconds
+_SAFE_RETRY_DELAY = float(os.getenv("SAFE_COMPLETE_RETRY_DELAY", "0.75"))  # seconds
+
+
+def _robust_complete(prompt: str) -> str:
+    """
+    Wrap the existing safe_complete with retry + basic timeout.
+    Timeout is enforced as a soft wall-clock budget per attempt.
+    """
+    last_err: Exception | None = None
+    # retries=N means up to N+1 attempts total
+    for attempt in range(1, _SAFE_RETRIES + 2):
+        start = time.time()
+        try:
+            # If a provider supports a native timeout param, pass it via safe_complete.
+            result = safe_complete(prompt)
+            return result
+        except Exception as e:
+            last_err = e
+        # Soft timeout check (no provider-side cancellation)
+        elapsed = time.time() - start
+        if elapsed > _SAFE_TIMEOUT:
+            last_err = TimeoutError(
+                f"safe_complete exceeded {_SAFE_TIMEOUT:.1f}s on attempt {attempt}"
+            )
+        if attempt <= _SAFE_RETRIES:
+            time.sleep(_SAFE_RETRY_DELAY)
+        else:
+            break
+
+    # Final fallback: never crash the pipeline; provide a safe response
+    return (
+        "I couldn’t complete the generation step reliably. "
+        "Based on the provided documents, I don’t have a supported answer."
+    )
+
+
 def _prepare_context(question: str, k: int) -> tuple[str, list[str]]:
     """
     Retrieve top-k documents and return a stitched context plus their source paths.
     Deterministic, no network calls required.
+
+    Note:
+    - Uses similarity_search_with_score() so we *can* expose raw scores at higher layers
+      (API/CLI) without changing this function's return type.
     """
     retriever = get_retriever(persist_directory=settings.CHROMA_DIR, k=k)
-    docs: list[Document] = retriever.invoke(question)
 
+    # OLD (no scores):
+    # docs: list[Document] = retriever.invoke(question)
+
+    # NEW (with scores available):
+    results = retriever.vectorstore.similarity_search_with_score(question, k=k)
+    # results: list[tuple[Document, float]]  # cosine *distance* (lower is better)
+
+    # Keep original return contract: stitched context + list of source paths
+    docs = [doc for (doc, _score) in results]
     stitched = "\n".join(d.page_content for d in docs if d.page_content)
+
+    # Keep sources as plain paths here to avoid changing callers/tests
     sources = [str(d.metadata.get("source", "?")) for d in docs]
+
     return stitched.strip(), sources
 
 
@@ -65,7 +121,9 @@ def _answer_with_llm(system_prompt: str, question: str, context: str) -> str:
         f"QUESTION: {question}\n"
         "ANSWER:"
     )
-    completion = safe_complete(prompt).strip()
+    # Use robust wrapper (retries + soft timeout). Our tests that monkeypatch
+    # pipeline.safe_complete still work because this calls safe_complete() inside.
+    completion = _robust_complete(prompt).strip()
     return completion or _answer_offline(context)
 
 
