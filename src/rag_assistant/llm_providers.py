@@ -1,10 +1,13 @@
 # src/rag_assistant/llm_providers.py
 
 from __future__ import annotations
-
+import os
+import logging
 from typing import Protocol
 
 from .config import settings
+
+logger = logging.getLogger("rag-assistant")
 
 
 class LLMClient(Protocol):
@@ -120,10 +123,37 @@ def get_provider() -> LLMClient | None:
 
 def safe_complete(prompt: str) -> str:
     """
-    Convenience helper: run a completion if a real provider is configured,
-    otherwise return an empty string (offline mode).
+    Thin wrapper that routes to the configured provider.
+    Returns "" when provider is 'none' so the pipeline can fall back to extractive mode.
     """
-    client = get_provider()
-    if not client or getattr(client, "name", "none") == "none":
-        return ""
-    return client.complete(prompt)
+    provider = (settings.LLM_PROVIDER or "none").lower()
+
+    # Decide model name for logging (matches your existing defaults/env)
+    if provider == "groq":
+        model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    elif provider == "openai":
+        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    elif provider == "gemini":
+        model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    else:
+        model = "-"
+
+    # 🔎 New: unmissable log line on every call
+    logger.info(f"LLM call -> provider={provider} model={model} prompt_chars={len(prompt)}")
+
+    # ===== your existing routing logic below =====
+    if provider == "none":
+        return ""  # let pipeline fall back
+
+    if provider == "groq":
+        # existing Groq call using model above
+        # return client.chat.completions.create(...).choices[0].message.content
+        ...
+
+    if provider == "openai":
+        ...
+    if provider == "gemini":
+        ...
+
+    # If something goes wrong, be safe and return empty to trigger extractive fallback
+    return ""
