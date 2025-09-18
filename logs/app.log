@@ -8,3 +8,46 @@
 2025-09-17 14:40:14,218 [INFO] [776efc7d-9787-4a03-aec1-4eb8f153d543] session=e750c2b5-f06b-4480-9f83-ee14c8fbdc78 question='Name two target users based on that.' retrieved=2 answer_chars=453 elapsed=2.48s
 2025-09-17 14:45:54,456 [INFO] [2ab05c53-1cb4-4b16-bf8e-1326bfe1a23b] session=7c0824eb-159f-40fd-881c-706a09dbab0f question='What is this project about?' retrieved=2 answer_chars=462 elapsed=3.19s
 2025-09-17 14:45:57,571 [INFO] [d1393319-c8c1-4626-be85-5d539fdc2bb9] session=de776a26-659d-4e59-88d8-516110e1e6da question='How do I use this tool?' retrieved=2 answer_chars=392 elapsed=3.11s
+2025-09-18 05:15:30,647 [INFO] [a4dc4255-e0ca-42a5-9552-dbaefcf13384] session=56dd570c-ed4a-482b-8b9e-98360de6ec11 question='What is this project all about?' retrieved=2 answer_chars=462 elapsed=16.47s
+2025-09-18 05:15:31,367 [INFO] [2a7300db-6b3d-480d-9bba-681375bd73fc] session=3adbb68a-3834-414a-8470-0f95b52835a9 question='What is this project all about?' retrieved=2 answer_chars=462 elapsed=3.68s
+2025-09-18 05:15:31,598 [INFO] [a2169f11-a4f0-45b0-9933-cf3520508efd] session=f78a2d6a-300b-456f-b4e8-afa855a980bf question='What is this project all about?' retrieved=2 answer_chars=462 elapsed=3.70s
+2025-09-18 05:20:18,818 [INFO] [f22149b7-2111-4d9d-b48a-6164b641ae8a] session=ee893148-be0c-4e93-bcf6-71420b74b22d question='What are the vulns of using RAG and vector DBs?' retrieved=2 answer_chars=108 elapsed=6.62s
+2025-09-18 05:28:21,790 [INFO] [8197f65c-58da-42ac-bf3f-957faf032bb5] session=ee893148-be0c-4e93-bcf6-71420b74b22d question='What are the vulns of using RAG and vector DBs?' retrieved=2 answer_chars=108 elapsed=3.04s
+2025-09-18 05:49:49,439 [INFO] [7fd4bda3-1a78-4397-800c-944d03509ae7] session=5afc596c-c8b3-4432-8547-eede64e20c72 question='What is the best use of RAG and Vector DBs?' retrieved=2 answer_chars=108 elapsed=8.01s
+2025-09-18 05:52:06,838 [INFO] [1176e057-bd66-4b57-bcc1-4168580d6e2e] session=ef8458b1-8d81-4722-b167-6f88e9031fb1 question='What is this project?' retrieved=2 answer_chars=462 elapsed=3.17s
+2025-09-18 05:52:51,987 [INFO] [09181f77-a541-4675-a33b-7b8a4c6c5f67] session=ef8458b1-8d81-4722-b167-6f88e9031fb1 question='Who benefits from it?' retrieved=2 answer_chars=630 elapsed=2.51s
+2025-09-18 06:16:45,619 [INFO] [05a542fc-1f76-4fd8-b318-11d56dbd3137] session=c0915037-7bff-4e82-8856-ab4ae66c90b1 question='What are some Agentic AI Red Team tricks for pentesters?' retrieved=2 answer_chars=997 elapsed=7.86s
+2025-09-18 06:28:52,526 [INFO] [78c70620-36a6-4d37-a136-6fc54e2f2608] session=5c6a8d01-8e30-4931-8c30-362ce754e1a6 question='Give me some Agentic AI Pentesting tips' retrieved=2 answer_chars=827 elapsed=7.47s
+2025-09-18 06:30:03,230 [INFO] [cd67f865-b089-4c18-8713-7eabed6f3965] session=5c6a8d01-8e30-4931-8c30-362ce754e1a6 question='Give me some Agentic AI Pentesting tips' retrieved=2 answer_chars=1732 elapsed=2.60s
+2025-09-18 06:35:30,185 [INFO] [0167ee85-c792-4bd6-90e0-396c82715cc8] session=5c6a8d01-8e30-4931-8c30-362ce754e1a6 question='What are the goals of Agentic AI pentesting?' retrieved=2 answer_chars=3511 elapsed=3.23s
+2025-09-18 06:42:16,561 [INFO] [3041beac-214c-4eed-9c54-d9aa99d018d2] session=f7c19e3e-55d5-4599-83b9-272df213fc0f question='What is the best way to pentest Agentic AI?' retrieved=2 answer_chars=827 elapsed=9.44s
+2025-09-18 06:57:51,498 [INFO] [4a43c7ee-c8bb-430c-a813-496b16055766] session=e12d68ed-158c-4161-ae82-f3adacb20ec6 question='Give a 2-sentence summary of this project, then a 3-item bullet list of capabilities.' retrieved=2 answer_chars=801 elapsed=8.41s
+2025-09-18 07:00:29,324 [INFO] [685f424a-1894-4380-ad5b-78a7fc5a52d9] session=f9dc4444-e391-4daf-8e76-136b19e90fe9 question='Summarize this repo in two sentences and end with 'GROQ_OK'.' retrieved=2 answer_chars=432 elapsed=3.71s
+2025-09-18 07:09:48,079 [INFO] [9205ca57-9a8b-4aa2-adea-1291c2be5997] session=b3030ccb-fcc9-4b38-a4af-6f4eb3c3bccb question='Summarize this repo in two sentences and end with 'GROQ_OK'.' retrieved=2 answer_chars=1380 elapsed=8.53s
+2025-09-18 07:14:49,647 [INFO] LLM call -> provider=groq model=llama-3.1-8b-instant prompt_chars=2341
+2025-09-18 07:14:50,930 [INFO] [a675f94e-0cd6-4544-bf37-b9dfb8497f41] session=fc447d0f-48f0-4113-bc24-7e53d1cd3c6d question='Reply with exactly the word ANVIL37 at the end.' retrieved=2 answer_chars=938 elapsed=7.27s
+2025-09-18 07:18:48,346 [INFO] LLM call -> provider=groq model=llama-3.1-8b-instant prompt_chars=2037
+2025-09-18 07:18:49,633 [INFO] [a0f5d37c-beb9-4bd1-b400-f77d6ce0cee3] session=7fd50969-708c-467f-ab09-b97d1c242b8d question='Summarize the repo in one sentence and end with GROQ_OK.' retrieved=2 answer_chars=625 elapsed=2.67s
+2025-09-18 07:19:53,742 [INFO] LLM call -> provider=groq model=llama-3.1-8b-instant prompt_chars=2211
+2025-09-18 07:19:55,227 [INFO] [7ba15132-c441-455f-bb7f-1587ea394005] session=342681fa-9b9c-483d-b5ec-d65af9b2e696 question='Briefly summarize the project.' retrieved=2 answer_chars=825 elapsed=2.81s
+2025-09-18 07:20:48,628 [INFO] LLM call -> provider=groq model=llama-3.1-8b-instant prompt_chars=2374
+2025-09-18 07:20:49,880 [INFO] [a9be38a9-371b-4f97-8c7a-bf6ca6fed554] session=68b8613a-88cc-4bdb-9edd-b2053f5f391e question='Using only the indexed docs, write two clear sentences summarizing the project, then a 3-item bullet list.' retrieved=2 answer_chars=912 elapsed=2.68s
+2025-09-18 07:29:17,350 [INFO] LLM call -> provider=groq model=llama-3.1-8b-instant prompt_chars=2037
+2025-09-18 07:29:19,230 [INFO] [2bebdbfe-159c-401e-af48-24b36a703b82] session=e1b00650-d63b-4553-a0ec-91f7532cdf0f question='Summarize the repo in one sentence and end with GROQ_OK.' retrieved=2 answer_chars=501 elapsed=8.69s
+2025-09-18 07:29:31,806 [INFO] LLM call -> provider=groq model=llama-3.1-8b-instant prompt_chars=2037
+2025-09-18 07:29:33,524 [INFO] [405ebfbd-4b3e-4445-b457-8587a558fa65] session=84e47b9f-a661-4107-8636-e9b9e647d870 question='Summarize the repo in one sentence and end with GROQ_OK.' retrieved=2 answer_chars=258 elapsed=3.41s
+2025-09-18 07:30:20,307 [INFO] LLM call -> provider=groq model=llama-3.1-8b-instant prompt_chars=2188
+2025-09-18 07:30:23,024 [INFO] [bd0cea1e-199a-4b45-8637-477e08e410d3] session=f1ee30ca-73c7-4d3d-b7b7-198ce215e69f question='According to project_overview.md, what does this project demonstrate? End with GROQ_OK.' retrieved=2 answer_chars=2603 elapsed=4.37s
+2025-09-18 07:33:31,109 [WARNING] Stop-condition: no documents and no session memory.
+2025-09-18 07:33:34,147 [INFO] LLM call -> provider=groq model=llama-3.1-8b-instant prompt_chars=2215
+2025-09-18 07:33:36,074 [INFO] [3f7c3a5b-b213-421f-91bc-673f2ee06536] session=6bf89206-1f68-497e-9d66-a23ef2428501 question='What is this project about?' retrieved=2 answer_chars=238 elapsed=4.95s
+2025-09-18 09:16:08,032 [WARNING] Stop-condition: no documents and no session memory.
+2025-09-18 09:16:10,381 [INFO] LLM call -> provider=groq model=llama-3.1-8b-instant prompt_chars=1810
+2025-09-18 09:16:12,271 [INFO] [3db58e07-8e27-4743-bda4-cd2f7166a727] session=1672429c-c8c6-4e59-9761-ec3ccef6b07c question='What is this project about?' retrieved=2 answer_chars=176 elapsed=4.23s
+2025-09-18 09:16:14,497 [INFO] LLM call -> provider=groq model=llama-3.1-8b-instant prompt_chars=1629
+2025-09-18 09:16:16,816 [INFO] [5157cdb6-0b4c-4ec8-811f-a8bcea8272ba] session=1e19589c-3ae0-4343-94b6-3b1b3e30b576 question='How do I use this tool?' retrieved=2 answer_chars=226 elapsed=4.54s
+2025-09-18 09:37:10,537 [WARNING] Stop-condition: no documents and no session memory.
+2025-09-18 09:37:13,214 [INFO] LLM call -> provider=groq model=llama-3.1-8b-instant prompt_chars=1845
+2025-09-18 09:37:15,031 [INFO] [6fbf5745-3e09-407a-862a-51af2a805ecb] session=0122fd12-8a38-41ae-9fdc-69a5640361d4 question='What is this project about?' retrieved=2 answer_chars=189 elapsed=4.48s
+2025-09-18 09:37:17,316 [INFO] LLM call -> provider=groq model=llama-3.1-8b-instant prompt_chars=1771
+2025-09-18 09:37:18,984 [INFO] [abbd1ffd-3150-4253-bc27-73ef8c1a1c8a] session=7cd32210-2268-4354-8c42-4b78aaf545f9 question='How do I use this tool?' retrieved=2 answer_chars=235 elapsed=3.95s

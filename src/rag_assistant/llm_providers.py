@@ -1,7 +1,6 @@
 # src/rag_assistant/llm_providers.py
-
 from __future__ import annotations
-import os
+
 import logging
 from typing import Protocol
 
@@ -12,24 +11,23 @@ logger = logging.getLogger("rag-assistant")
 
 class LLMClient(Protocol):
     """Minimal protocol each provider client should satisfy."""
-
-    def complete(self, prompt: str) -> str:  # pragma: no cover - thin wrapper
+    name: str
+    def complete(self, prompt: str) -> str:  # pragma: no cover
         ...
 
 
+# ------------------------- Null / offline -------------------------
 class _NullProvider:
-    """Offline/no-network provider used in CI/tests when LLM_PROVIDER='none'."""
-
+    """Offline/no-network provider used when LLM_PROVIDER='none'."""
     name = "none"
 
-    def complete(self, prompt: str) -> str:  # pragma: no cover - deterministic stub
-        # Keep behavior deterministic for tests; downstream code should
-        # rely on extractive answers / no-answer fallback when this is active.
+    def complete(self, prompt: str) -> str:  # pragma: no cover
+        # Deterministic empty output; pipeline will fall back to extractive mode.
         return ""
 
 
+# ------------------------- OpenAI -------------------------
 def _init_openai() -> LLMClient:
-    """Create a tiny OpenAI client wrapper; requires OPENAI_API_KEY."""
     if not settings.OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY not set but LLM_PROVIDER='openai'")
     try:
@@ -44,18 +42,23 @@ def _init_openai() -> LLMClient:
         name = "openai"
 
         def complete(self, prompt: str) -> str:  # pragma: no cover
-            resp = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,
-            )
-            return resp.choices[0].message.content or ""
+            try:
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "system", "content": "You are a helpful assistant."},
+                              {"role": "user", "content": prompt}],
+                    temperature=0.0,
+                )
+                return resp.choices[0].message.content or ""
+            except Exception as e:
+                logger.warning(f"OpenAI completion failed: {e}")
+                return ""
 
     return _OpenAIClient()
 
 
+# ------------------------- Groq -------------------------
 def _init_groq() -> LLMClient:
-    """Create a tiny Groq client wrapper; requires GROQ_API_KEY."""
     if not settings.GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY not set but LLM_PROVIDER='groq'")
     try:
@@ -64,24 +67,29 @@ def _init_groq() -> LLMClient:
         raise RuntimeError(f"Groq client import failed: {exc}") from exc
 
     client = Groq(api_key=settings.GROQ_API_KEY)
-    model = settings.GROQ_MODEL
+    model = settings.GROQ_MODEL  # e.g., "llama-3.1-8b-instant"
 
     class _GroqClient:
         name = "groq"
 
         def complete(self, prompt: str) -> str:  # pragma: no cover
-            resp = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,
-            )
-            return resp.choices[0].message.content or ""
+            try:
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "system", "content": "You are a helpful assistant."},
+                              {"role": "user", "content": prompt}],
+                    temperature=0.0,
+                )
+                return resp.choices[0].message.content or ""
+            except Exception as e:
+                logger.warning(f"Groq completion failed: {e}")
+                return ""
 
     return _GroqClient()
 
 
+# ------------------------- Gemini -------------------------
 def _init_gemini() -> LLMClient:
-    """Create a tiny Gemini client wrapper; requires GEMINI_API_KEY."""
     if not settings.GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY not set but LLM_PROVIDER='gemini'")
     try:
@@ -97,17 +105,21 @@ def _init_gemini() -> LLMClient:
         name = "gemini"
 
         def complete(self, prompt: str) -> str:  # pragma: no cover
-            resp = model.generate_content(prompt)
-            return getattr(resp, "text", "") or ""
+            try:
+                resp = model.generate_content(prompt)
+                return getattr(resp, "text", "") or ""
+            except Exception as e:
+                logger.warning(f"Gemini completion failed: {e}")
+                return ""
 
     return _GeminiClient()
 
 
-def get_provider() -> LLMClient | None:
+# ------------------------- Provider factory -------------------------
+def get_provider() -> LLMClient:
     """
-    Return an initialized provider client or None if LLM_PROVIDER is 'none'.
-
-    Defaults to 'none' in CI/tests to avoid network calls.
+    Return an initialized provider client; returns _NullProvider for 'none'.
+    Defaults to 'none' to avoid network calls in CI/tests.
     """
     prov = (settings.LLM_PROVIDER or "none").lower()
     if prov == "none":
@@ -121,39 +133,30 @@ def get_provider() -> LLMClient | None:
     raise ValueError(f"Unknown LLM_PROVIDER: {prov}")
 
 
+# ------------------------- Unified entrypoint -------------------------
 def safe_complete(prompt: str) -> str:
     """
-    Thin wrapper that routes to the configured provider.
-    Returns "" when provider is 'none' so the pipeline can fall back to extractive mode.
+    Route to the configured provider. On any failure, return "" so the caller
+    can fall back to extractive answers — never raise from here.
+    Logs one unmissable line per call.
     """
-    provider = (settings.LLM_PROVIDER or "none").lower()
+    try:
+        provider = get_provider()
+        # determine model name string for logging
+        if provider.name == "groq":
+            model = settings.GROQ_MODEL
+        elif provider.name == "openai":
+            model = settings.OPENAI_MODEL
+        elif provider.name == "gemini":
+            model = settings.GEMINI_MODEL
+        else:
+            model = "-"
 
-    # Decide model name for logging (matches your existing defaults/env)
-    if provider == "groq":
-        model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-    elif provider == "openai":
-        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    elif provider == "gemini":
-        model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-    else:
-        model = "-"
-
-    # 🔎 New: unmissable log line on every call
-    logger.info(f"LLM call -> provider={provider} model={model} prompt_chars={len(prompt)}")
-
-    # ===== your existing routing logic below =====
-    if provider == "none":
-        return ""  # let pipeline fall back
-
-    if provider == "groq":
-        # existing Groq call using model above
-        # return client.chat.completions.create(...).choices[0].message.content
-        ...
-
-    if provider == "openai":
-        ...
-    if provider == "gemini":
-        ...
-
-    # If something goes wrong, be safe and return empty to trigger extractive fallback
-    return ""
+        logger.info(
+            "LLM call -> provider=%s model=%s prompt_chars=%d",
+            provider.name, model, len(prompt)
+        )
+        return provider.complete(prompt) or ""
+    except Exception as e:  # extreme fallback
+        logger.warning(f"safe_complete failed; falling back to extractive. error={e}")
+        return ""
