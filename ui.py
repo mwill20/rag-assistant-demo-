@@ -222,12 +222,14 @@ if go and q.strip():
     if sources:
         for s in sources:
             label = f"{s.get('path')}" + (f" (page {s.get('page')})" if s.get("page") else "")
-            dist = s.get("score")
+            dist = s.get("distance")
             href = s.get("href")
+            suffix = f" — distance: `{float(dist):.3f}`" if isinstance(dist, (int, float)) else ""
             if href:
-                st.markdown(f"- [{label}]({href}) — distance: `{dist:.3f}`")
+                st.markdown(f"- [{label}]({href}){suffix}")
             else:
-                st.markdown(f"- {label} — distance: `{dist:.3f}`")
+                st.markdown(f"- {label}{suffix}")
+
     else:
         for p in res.get("sources", []):
             st.markdown(f"- {p}")

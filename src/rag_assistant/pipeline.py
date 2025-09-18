@@ -3,18 +3,22 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import List, Tuple
 
 from langchain.schema import Document
 from pydantic import BaseModel
 
 from .config import settings
 from .llm_providers import safe_complete
-from .providers import get_retriever
+
+# Build retriever locally so we can force MMR (diversified results)
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
 
 
 class PipelineResult(BaseModel):
     answer: str
-    sources: list[str]
+    sources: List[str]
 
 
 def _load_system_prompt() -> str:
@@ -31,16 +35,32 @@ def _load_system_prompt() -> str:
     return "You are a concise RAG assistant. Cite sources when possible."
 
 
-def _prepare_context(question: str, k: int) -> tuple[str, list[str]]:
+def _build_retriever(k: int):
+    """
+    Create a Chroma retriever with MMR (maximal marginal relevance) to reduce duplicates.
+    - k: number of final results returned to the pipeline
+    """
+    embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
+    vs = Chroma(embedding_function=embeddings, persist_directory=settings.CHROMA_DIR)
+    # MMR diversifies results while staying relevant
+    fetch_k = max(8, k * 8)
+    return vs.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": k, "fetch_k": fetch_k, "lambda_mult": 0.7},
+    )
+
+
+def _prepare_context(question: str, k: int) -> Tuple[str, List[str]]:
     """
     Retrieve top-k documents and return a stitched context plus their source paths.
     Deterministic, no network calls required.
     """
-    retriever = get_retriever(persist_directory=settings.CHROMA_DIR, k=k)
-    docs: list[Document] = retriever.get_relevant_documents(question)
+    retriever = _build_retriever(k)
+    docs: List[Document] = retriever.invoke(question)  # modern API
 
     stitched = "\n".join(d.page_content for d in docs if d.page_content)
-    sources = [str(d.metadata.get("source", "?")) for d in docs]
+    # Normalize paths to forward slashes for consistency with API/static links
+    sources = [str(d.metadata.get("source", "?")).replace("\\", "/") for d in docs]
     return stitched.strip(), sources
 
 
@@ -72,7 +92,7 @@ def _answer_with_llm(system_prompt: str, question: str, context: str) -> str:
 def run_pipeline(question: str, *, return_format: str = "json") -> dict[str, object]:
     """
     Main entry used by the API and tests.
-    - Retrieves top-k docs
+    - Retrieves top-k docs (MMR retriever)
     - Produces an answer via offline stitching or LLM (if configured)
     - Returns {'answer': str, 'sources': List[str]}
     """
@@ -83,6 +103,4 @@ def run_pipeline(question: str, *, return_format: str = "json") -> dict[str, obj
     answer = _answer_with_llm(system_prompt, question, context)
 
     result = PipelineResult(answer=answer, sources=sources)
-    if return_format.lower() == "json":
-        return result.model_dump()
     return result.model_dump()
