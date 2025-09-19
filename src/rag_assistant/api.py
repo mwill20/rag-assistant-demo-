@@ -12,6 +12,7 @@ from pathlib import PurePosixPath
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
+
 # ---- App & static files ------------------------------------------------------
 
 DATA_DIR = os.getenv("DATA_DIR", "./data")      # set to repo root externally to serve /docs too
@@ -32,11 +33,11 @@ class AskRequest(BaseModel):
 
 
 class ScoredSource(BaseModel):
-    name: str                       # e.g., "docs/file.pdf" (relative path)
-    href: Optional[str] = None      # absolute link for UI
-    page: Optional[int] = None      # PDF page, if available
-    distance: Optional[float] = None  # cosine distance (lower = closer)
-    label: Optional[str] = None     # friendly basename for display
+    name: str                        # e.g., "docs/file.pdf" (relative path under DATA_DIR)
+    href: Optional[str] = None       # absolute link for UI
+    page: Optional[int] = None       # PDF page, if available
+    distance: Optional[float] = None # cosine distance (lower = closer)
+    label: Optional[str] = None      # friendly basename for display
 
 
 class AskResponse(BaseModel):
@@ -74,7 +75,7 @@ def _build_vectorstore() -> Chroma:
     return Chroma(embedding_function=embeddings, persist_directory=CHROMA_DIR)
 
 
-# ---- Health/ready endpoints ---------------------------------------------------
+# ---- Health/ready endpoints --------------------------------------------------
 
 @app.get("/healthz")
 def healthz():
@@ -103,7 +104,7 @@ def ask(req: AskRequest, request: Request):
     """
     Returns:
       - answer (LLM/extractive from pipeline)
-      - sources (legacy list of names)
+      - sources (legacy/simple list of names)
       - sources_scored (clickable links + cosine distance + label)
     """
     # 1) Final answer via your pipeline (keeps behavior intact)
@@ -111,7 +112,7 @@ def ask(req: AskRequest, request: Request):
     pipeline_result = run_pipeline(req.question, return_format="json")
 
     answer = pipeline_result.get("answer", "")
-    sources_legacy = [s.replace("\\", "/") for s in pipeline_result.get("sources", [])]
+    sources_legacy = [(s or "").replace("\\", "/") for s in (pipeline_result.get("sources") or [])]
 
     # 2) Retrieve a diverse top-k with distances; dedupe (source,page)
     vs = _build_vectorstore()
@@ -119,7 +120,7 @@ def ask(req: AskRequest, request: Request):
     scored: List[ScoredSource] = []
 
     try:
-        pool_k = 40   # sample large pool
+        pool_k = 40   # sample larger pool for better diversity
         final_k = 5   # keep top unique hits
         pool: List[Tuple[object, float]] = vs.similarity_search_with_score(req.question, k=pool_k)  # type: ignore[assignment]
         seen = set()
@@ -146,23 +147,12 @@ def ask(req: AskRequest, request: Request):
     except Exception:
         scored = []
 
-    # 3) Fallback to legacy names if scoring failed
-    if not scored and sources_legacy:
-        for s in sources_legacy:
-            rel = _norm_rel_path(s)
-            scored.append(
-                ScoredSource(
-                    name=rel,
-                    href=_href_for(rel, None, base),
-                    page=None,
-                    distance=None,
-                    label=_label_for(rel, None),
-                )
-            )
+    # 3) Prefer scored names (with links) for 'sources'; fall back to legacy
+    names_from_scored = [s.name for s in scored]
+    sources_out = names_from_scored if names_from_scored else sources_legacy
 
     return AskResponse(
         answer=answer,
-        sources=[s.name for s in scored] if scored else sources_legacy,
+        sources=sources_out,
         sources_scored=scored,
     )
-

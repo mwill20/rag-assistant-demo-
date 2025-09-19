@@ -76,7 +76,7 @@ def run_qa(question: str, k: int = 2) -> tuple[str, list[str]]:
 def main():
     query = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "What is this project?"
     answer, sources = run_qa(query)
-    print(json.dumps({"answer": answer, "sources": sources}, ensure_ascii=False))
+    print(json.dumps({"answer": answer, "sources": sources}, ensure_ascii=True))
 
 
 if __name__ == "__main__":
