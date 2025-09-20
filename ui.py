@@ -1,11 +1,12 @@
 # ui.py — Streamlit UI (wide, scaled, humanized answer rendering)
 from __future__ import annotations
-import os, json, time, pathlib, subprocess, re
+import os, sys, json, time, pathlib, subprocess, re
 from typing import Any, Dict, List, Optional
 
 import requests
 import streamlit as st
 import pandas as pd
+from pathlib import Path
 
 DEFAULT_API_BASE = os.getenv("RAG_API_BASE", "http://127.0.0.1:8000")
 DATA_DIR = pathlib.Path(os.getenv("DATA_DIR", "./data")).resolve()
@@ -16,6 +17,8 @@ st.set_page_config(page_title="RAG Assistant", page_icon="🔎", layout="wide")
 with st.sidebar:
     st.markdown("## ⚙️ Settings")
     api_base = st.text_input("API Base URL", value=DEFAULT_API_BASE)
+    provider = st.selectbox("LLM Provider", ["none", "openai", "groq"], index=0)
+    api_key = st.text_input("API Key", type="password", placeholder="Paste provider key (kept in-session)")
     if "session_id" not in st.session_state:
         st.session_state.session_id = None
 
@@ -24,7 +27,7 @@ with st.sidebar:
         help="Increase overall font & element sizes"
     )
     st.write(f"**Session:** {st.session_state.session_id or '—'}")
-    show_raw = st.checkbox("Show raw context + memory (debug)", value=False)
+    show_raw = st.checkbox("Show raw response JSON (debug)", value=False)
     st.markdown("---")
 
     st.markdown("### 📚 Add Documents (optional)")
@@ -45,7 +48,13 @@ with st.sidebar:
                 try:
                     start = time.time()
                     proc = subprocess.run(
-                        ["python", "-m", "rag_assistant.ingest"],
+                        [sys.executable, "-m", "rag_assistant.ingest"],  # venv’s Python
+                        cwd=str(pathlib.Path(__file__).resolve().parent),
+                        env={
+                            **os.environ,
+                            "DATA_DIR": str(DATA_DIR),
+                            "CHROMA_DIR": os.getenv("CHROMA_DIR", "./storage"),
+                        },
                         capture_output=True, text=True, check=True
                     )
                     st.success(f"Ingest complete in {time.time()-start:.2f}s.\n\n{proc.stdout}")
@@ -78,7 +87,6 @@ st.markdown(
     h1, .stMarkdown h1 {{ font-size: {int(base_px*2.0)}px; }}
     h2, .stMarkdown h2 {{ font-size: {int(base_px*1.6)}px; }}
     h3, .stMarkdown h3 {{ font-size: {int(base_px*1.35)}px; }}
-    .small {{ font-size: {small_px}px; color: #9ca3af; }}
 
     .rag-card {{
         background: #111827;
@@ -86,9 +94,17 @@ st.markdown(
         padding: 1.25rem 1.5rem;
         border-radius: 14px;
         box-shadow: 0 0 16px rgba(0,0,0,0.25);
-        line-height: 1.65;
+        /* readability tweaks */
+        max-width: 980px;
+        margin: 0 auto;
+        line-height: 1.75;
         font-size: {int(base_px*1.02)}px;
     }}
+
+    /* Paragraph + list spacing */
+    .rag-card p {{ margin: 0 0 0.9rem 0; }}
+    .rag-card ul {{ margin: 0.25rem 0 0.75rem 1.25rem; }}
+    .rag-card li {{ margin: 0.15rem 0; }}
 
     textarea {{ min-height: {textarea_min_h}px !important; font-size: {int(base_px*1.0)}px !important; }}
 
@@ -103,6 +119,19 @@ st.markdown(
     .stButton>button:hover {{ filter: brightness(1.05); }}
 
     a, a:visited {{ color: #60a5fa; }}
+
+    /* Badges for page and score */
+    .badge {{
+        display: inline-block;
+        padding: 0.08rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.85em;
+        border: 1px solid #374151;
+        background: #111827;
+        margin-left: 0.35rem;
+    }}
+    .badge.score {{ background: #0b1220; }}
+    .badge.page  {{ background: #1b2437; }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -121,41 +150,25 @@ def reflow_pdf_text(text: str) -> str:
     return t.strip()
 
 def strip_header_sections(text: str) -> str:
-    """
-    In offline/extractive mode the answer may start with
-    'SESSION MEMORY: ... CONTEXT: ...'. Show only the content after CONTEXT:.
-    """
+    """If offline/extractive shows CONTEXT blocks, hide labels before answer."""
     if not text:
         return text
     t = text
-    # Prefer the last CONTEXT:, in case it appears earlier in memory text.
     last_ctx = t.rfind("CONTEXT:")
     if last_ctx != -1:
         t = t[last_ctx + len("CONTEXT:") :]
-    # Remove any leading label residue
     t = re.sub(r"^\s*(Answer:|ANSWER:)\s*", "", t)
     return t.strip()
 
 _BULLET_CHARS = r"•·▪●○◦"
 def bulletize(text: str) -> str:
-    """
-    Convert inline bullets into Markdown list items.
-    Also handles ' o ' style bullets (common in PDF extracts).
-    """
+    """Convert inline bullets into Markdown list items (incl. ' o ' pattern)."""
     if not text:
         return text
     t = text
-
-    # Convert explicit bullet glyphs into list items
     t = re.sub(fr"\s*[{_BULLET_CHARS}]\s*", "\n- ", t)
-
-    # Convert ' o ' separators to bullets when between words
     t = re.sub(r"\s[oO]\s(?=[A-Za-z])", "\n- ", t)
-
-    # Normalize: ensure '- ' starts at line-begin
     t = re.sub(r"[ \t]*\n[ \t]*-\s*", "\n- ", t)
-
-    # If we now have a dense line with many bullets, add paragraph breaks before headers-like chunks.
     return t.strip()
 
 def humanize_answer(text: str) -> str:
@@ -164,12 +177,25 @@ def humanize_answer(text: str) -> str:
     t = bulletize(t)
     return t.strip()
 
+def _fmt_score(x) -> str:
+    try:
+        return f"{float(x):.3f}"
+    except Exception:
+        return "0.000"
+
 # ---------- API helpers ----------
-def post_ask(api_base: str, question: str, session_id: Optional[str]) -> Dict[str, Any]:
+def post_ask(api_base: str, question: str, session_id: Optional[str],
+             provider: Optional[str], api_key: Optional[str]) -> Dict[str, Any]:
     url = f"{api_base.rstrip('/')}/ask"
     payload: Dict[str, Any] = {"question": question}
     if session_id:
         payload["session_id"] = session_id
+    # per-request LLM selection
+    provider = (provider or "").strip().lower()
+    if provider and provider != "none" and api_key:
+        payload["llm_provider"] = provider
+        payload["api_key"] = api_key
+
     r = requests.post(url, json=payload, timeout=30)
     r.raise_for_status()
     return r.json()
@@ -177,15 +203,51 @@ def post_ask(api_base: str, question: str, session_id: Optional[str]) -> Dict[st
 def build_sources_df(sources_scored: List[Dict[str, Any]]) -> pd.DataFrame:
     rows: List[Dict[str, Any]] = []
     for s in sources_scored or []:
+        name = s.get("name")
+        label = s.get("label") or (Path(name).name if name else None)
         rows.append({
-            "path": s.get("path"),
+            "name": name,
+            "label": label,
             "page": s.get("page"),
-            "metric": s.get("metric"),
-            "score_type": s.get("score_type"),
-            "distance": s.get("score"),
+            "distance": s.get("distance"),
             "href": s.get("href"),
         })
     return pd.DataFrame(rows)
+
+def render_answer(resp: Dict[str, Any]):
+    st.markdown("### Answer")
+    raw_answer = (resp.get("answer") or "").strip()
+    st.markdown(f"<div class='rag-card'><p>{humanize_answer(raw_answer)}</p></div>", unsafe_allow_html=True)
+
+    # --- Sources (legacy list: basenames only) ---
+    sources = resp.get("sources") or []
+    if sources:
+        st.markdown("### Sources")
+        st.markdown("<div class='rag-card'>", unsafe_allow_html=True)
+        for s in sources:
+            st.markdown(f"- {Path(str(s)).name}")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- Evidence (clickable links + cosine distance) ---
+    scored = resp.get("sources_scored") or []
+    if scored:
+        st.markdown("### Evidence (links + distance)")
+        st.markdown("<div class='rag-card'>", unsafe_allow_html=True)
+        for item in scored:
+            name = item.get("label") or Path(str(item.get("name") or "")).name or "Source"
+            href = item.get("href") or ""
+            score = _fmt_score(item.get("distance"))
+            page = item.get("page")
+            page_badge = f"<span class='badge page'>page {int(page)}</span>" if isinstance(page, (int, float)) else ""
+            score_badge = f"<span class='badge score'>dist {score}</span>"
+            if href:
+                st.markdown(
+                    f"- <a href=\"{href}\">{name}</a> {page_badge} {score_badge}",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(f"- {name} {page_badge} {score_badge}", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------- Main ----------
 st.markdown("<h1>🔎 RAG Assistant</h1>", unsafe_allow_html=True)
@@ -195,52 +257,30 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-q = st.text_area("Your question", placeholder="e.g., What is this project all about?")
+q = st.text_area("Your question", placeholder="e.g., Summarize this doc in 10 words.")
 go = st.button("Ask")
 
 if go and q.strip():
     try:
-        res = post_ask(api_base, q.strip(), st.session_state.session_id)
+        res = post_ask(api_base, q.strip(), st.session_state.session_id, provider, api_key)
     except Exception as e:
         st.error(f"Request failed: {e}")
         st.stop()
 
     st.session_state.session_id = res.get("session_id", st.session_state.session_id)
 
-    st.markdown("<div class='rag-card'>", unsafe_allow_html=True)
-    st.markdown("### Answer")
-
-    raw_answer = (res.get("answer") or "").strip()
     if show_raw:
-        st.markdown("##### Raw context + memory")
-        st.code(raw_answer)
-        st.markdown("##### Rendered")
-    st.markdown(humanize_answer(raw_answer))
+        with st.expander("🔧 Debug JSON"):
+            st.code(json.dumps(res, indent=2), language="json")
 
-    st.markdown("### Sources")
-    sources = res.get("sources_scored") or []
-    if sources:
-        for s in sources:
-            label = f"{s.get('path')}" + (f" (page {s.get('page')})" if s.get("page") else "")
-            dist = s.get("distance")
-            href = s.get("href")
-            suffix = f" — distance: `{float(dist):.3f}`" if isinstance(dist, (int, float)) else ""
-            if href:
-                st.markdown(f"- [{label}]({href}){suffix}")
-            else:
-                st.markdown(f"- {label}{suffix}")
-
-    else:
-        for p in res.get("sources", []):
-            st.markdown(f"- {p}")
-
-    st.markdown("</div>", unsafe_allow_html=True)
+    render_answer(res)
 
     with st.expander("🔧 Debug: Top-k chunks & scores"):
         df = build_sources_df(res.get("sources_scored") or [])
         if not df.empty:
             st.dataframe(df, use_container_width=True, hide_index=True)
-        st.code(json.dumps(res, indent=2), language="json")
+        else:
+            st.write("No scored sources returned.")
 
 st.markdown(
     "<p class='small'>Cosine distance is shown (lower = closer). "

@@ -65,36 +65,13 @@ def _build_retriever(k: int):
 
 
 def _prepare_context(question: str, k: int) -> Tuple[str, List[str]]:
-    """
-    Retrieve top-k documents and return a stitched context plus their source paths.
-    Deterministic, no network calls required.
-
-    Test-only behavior: when running under pytest, prefer Markdown sources (.md)
-    so golden tests that target the tiny MD corpus remain stable even if the DB
-    also contains PDFs. If no MD docs are in the first pass, do a bigger pass and
-    select the MD hits if any are present.
-    """
-    def _is_md(doc: Document) -> bool:
-        src = str(doc.metadata.get("source", "")).lower()
-        return src.endswith(".md")
-
     retriever = _build_retriever(k)
-    docs: List[Document] = retriever.invoke(question)  # modern API
-
-    if "PYTEST_CURRENT_TEST" in os.environ:
-        md_docs = [d for d in docs if _is_md(d)]
-        if not md_docs:
-            # second pass with a larger k to try to surface MD docs
-            retriever_big = _build_retriever(max(k, 20))
-            docs_big: List[Document] = retriever_big.invoke(question)
-            md_docs = [d for d in docs_big if _is_md(d)]
-        if md_docs:
-            docs = md_docs
+    docs: List[Document] = retriever.invoke(question)
 
     stitched = "\n".join(d.page_content for d in docs if d.page_content)
-    # Normalize paths to forward slashes for consistency with API/static links
     sources = [str(d.metadata.get("source", "?")).replace("\\", "/") for d in docs]
     return stitched.strip(), sources
+
 
 
 def _answer_offline(stitched_context: str) -> str:
